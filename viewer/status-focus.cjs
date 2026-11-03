@@ -29,6 +29,7 @@ const CAPSULE_MARGIN = 12
 const CARD_W = 360
 const CARD_H = 236
 const TICK_MS = 1000
+const REFRESH_MS = 60_000 // 跨天自愈：每分钟重读一次数值，跨过 00:00 后最多 60 秒胶囊就回到当天初始值
 const WAKE_BUBBLE = '休息一下，顺便给我换水吧。'
 
 /**
@@ -53,6 +54,7 @@ function registerStatusFocus(deps) {
   let session = null
   let visible = true // 胶囊是否启用（用户可在菜单里关掉）
   let screenListenerBound = false
+  let refreshTimer = null
 
   // ---------- 落盘 ----------
   function writeFocus(next) {
@@ -141,6 +143,7 @@ function registerStatusFocus(deps) {
       if (!capsuleWindow || capsuleWindow.isDestroyed()) return
       capsuleWindow.showInactive() // 不抢焦点
       refreshCapsule()
+      startRefreshTimer()
     })
     capsuleWindow.on('closed', () => { capsuleWindow = null })
     // 换分辨率/插拔屏：位置重算，否则会飘出屏幕（只挂一次，窗口重建不叠加）
@@ -213,6 +216,23 @@ function registerStatusFocus(deps) {
     if (!session) return { focusing: false, remainMs: 0, text: '' }
     const remain = remainingMs(session.endAt)
     return { focusing: remain > 0, remainMs: remain, text: formatCountdown(remain), minutes: session.minutes }
+  }
+
+  /**
+   * 跨天自愈：数值只在"下一次读写"时才会重置（stats-store 的设计），
+   * 如果用户开着桌宠过夜、也不点任何东西，胶囊会一直显示昨天的数字。
+   * 这里用 60 秒的轻量轮询兜底——读一次就会触发 stats-store 的跨天重置并广播刷新。
+   */
+  function startRefreshTimer() {
+    if (refreshTimer) return
+    refreshTimer = setInterval(() => {
+      try {
+        refreshCapsule()
+      } catch (e) {
+        console.error('[PetPet][数值] 定时刷新失败:', e && e.message)
+      }
+    }, REFRESH_MS)
+    if (refreshTimer.unref) refreshTimer.unref()
   }
 
   function stopTick() {
@@ -334,6 +354,7 @@ function registerStatusFocus(deps) {
     /** 退出前清理计时器，避免 app.quit 时留下 interval */
     dispose() {
       stopTick()
+      if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null }
       session = null
     }
   }
