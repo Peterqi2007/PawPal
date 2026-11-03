@@ -209,7 +209,8 @@ function registerPetCompanion(deps) {
   ipcMain.handle('stats:patch', (_evt, petId, delta) => {
     const r = statsStore.patch(petId, delta)
     if (r.ok) {
-      console.log('[PetPet][数值]', petId, JSON.stringify(r.applied), '→', JSON.stringify({
+      // 记录**原始 delta**：排查"数值为什么涨"时，光看 applied 分不清是点击喂食、打卡还是惩罚
+      console.log('[PetPet][数值]', petId, 'delta=' + JSON.stringify(delta || {}), JSON.stringify(r.applied), '→', JSON.stringify({
         mood: r.state.mood, satiety: r.state.satiety, checkins: r.state.checkins
       }))
       // B 组约定：数值变了广播 capsule:refresh，胶囊不自己算分（docs/handoff/B §B2）

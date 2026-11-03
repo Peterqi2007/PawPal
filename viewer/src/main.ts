@@ -10,6 +10,7 @@ import { effectiveWeight } from './temperament' // V2-A: 气质调制器（2026-
 import { resolveHit, buildAlphaMap, toLayoutPoint } from './hit-test'
 import { pickBubble, type BubbleScene } from './persona-bubbles'
 import { expressionOf, thresholdBubble } from './pet-expression'
+import { isClickGesture } from './click-guard'
 import { heartBurstSpec, HEART_BURST_MS, HEART_GLYPH, heartEnd, heartOpacity } from './heart-burst'
 import {
   createQueue, enqueue, currentOf, pendingCount, dismiss,
@@ -249,14 +250,26 @@ async function init() {
 
   // 单击 = 互动：点头部摸头 / 点身体喂食 / 点透明区无反应（Part A）
   // 功能入口：托盘 + 右键菜单（原生菜单，自动毛玻璃/定位）
-  let downPos = { x: 0, y: 0 }
+  // 注意：downPos 必须是"这次按下才有"，用完即清。
+  // 之前它一直留着上一次的位置 → 任何一次 pointerup（包括没有对应 pointerdown 的、
+  // 或拖拽结束后残留的）只要离旧坐标 <6px 就会被当成一次点击，表现为"没点它也在喂食"。
+  let downPos: { x: number; y: number } | null = null
   let lastPointerUp = 0
-  app.canvas.addEventListener('pointerdown', (e) => { downPos = { x: e.clientX, y: e.clientY } })
+  app.canvas.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return
+    downPos = { x: e.clientX, y: e.clientY }
+  })
+  const clearDown = () => { downPos = null }
+  app.canvas.addEventListener('pointercancel', clearDown)
+  app.canvas.addEventListener('pointerleave', clearDown)
   app.canvas.addEventListener('pointerup', (e) => {
     lastPointerUp = Date.now()
     if (e.button !== 0) return // 只处理左键（右键走 contextmenu 菜单）
-    const dist = Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y)
-    if (dist < 6) void handlePetClick(e.clientX, e.clientY)
+    const start = downPos
+    downPos = null // 一次按下只判定一次点击
+    if (isClickGesture(start, { x: e.clientX, y: e.clientY })) {
+      void handlePetClick(e.clientX, e.clientY)
+    }
   })
 
   // 右键 → 原生 macOS 菜单（主进程 Menu.popup，自动毛玻璃/定位）
