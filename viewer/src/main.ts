@@ -9,6 +9,7 @@ import { effectiveWeight } from './temperament' // V2-A: 气质调制器（2026-
 // Part A：陪伴交互（左键分区 / 人格气泡 / 提醒三件套）
 import { resolveHit, buildAlphaMap, toLayoutPoint } from './hit-test'
 import { pickBubble, type BubbleScene } from './persona-bubbles'
+import { expressionOf, thresholdBubble } from './pet-expression'
 import {
   createQueue, enqueue, currentOf, pendingCount, dismiss,
   type QueueState, type ReminderEntry
@@ -95,6 +96,8 @@ declare global {
       reportAudio: (status: string, detail?: string) => void
       onFocusChange: (cb: (entering: boolean) => void) => void
       onBubble: (cb: (text: string) => void) => void
+      reminderAck: (id: string) => void
+      onReminderMissed: (cb: (info: { id: string; state?: { mood: number; satiety: number } }) => void) => void
     }
   }
 }
@@ -632,11 +635,18 @@ async function handlePetClick(x: number, y: number) {
   else await interactFeed()
 }
 
+/** 饱腹/心情告急时，气泡优先说这件事（"瘫倒喊饿"必须真的喊出来） */
+function urgentBubble(): string {
+  return expressionOf(lastStats).bubble
+}
+
 /** 摸头：弹跳 + 人格气泡 + 心情 +5（每日封顶 15，由主进程判定） */
 async function interactHead() {
   bouncePet()
   const r = await statsPatch({ mood: 5 })
   const capped = !!r?.capped?.mood
+  const urgent = urgentBubble()
+  if (urgent) return showBubbleText(urgent, 'head')
   showBubbleText(capped ? '今天摸够啦，明天再来～' : undefined, 'head')
 }
 
@@ -644,6 +654,8 @@ async function interactHead() {
 async function interactFeed() {
   const r = await statsPatch({ feed: true })
   const capped = !!r?.capped?.satiety
+  const urgent = urgentBubble()
+  if (urgent) return showBubbleText(urgent, 'feed')
   showBubbleText(capped ? '已经吃得饱饱的啦' : undefined, 'feed')
 }
 
@@ -666,12 +678,46 @@ function shakePet() {
 }
 
 /** 数值更新：B 组未就绪时静默降级（不弹错、不打断互动） */
+// ===== 数值 → 表现（饱腹<30 瘫倒、>80 跳跃；心情<30 乌云、>80 爱心）=====
+let lastStats: { mood: number; satiety: number } | null = null
+
+function applyPetExpression(next: { mood?: number; satiety?: number } | null | undefined, opts: { bubble?: boolean } = {}) {
+  if (!next) return
+  const expr = expressionOf(next)
+  const stage = document.getElementById('petStage')
+  if (stage) {
+    stage.classList.toggle('pp-collapsed', expr.collapsed)
+    stage.classList.toggle('pp-jump', expr.jump)
+    stage.classList.toggle('pp-sad', expr.moodFace === 'sad')
+  }
+  const overlay = document.getElementById('pet-overlay')
+  if (overlay) {
+    overlay.textContent = expr.overlay === 'cloud' ? '☁️' : expr.overlay === 'hearts' ? '💗' : ''
+    overlay.classList.toggle('hidden', !expr.overlay)
+  }
+  // 只在"跨过阈值"时冒一次气泡，避免每次 +5 都刷屏
+  if (opts.bubble !== false) {
+    const text = thresholdBubble(lastStats, next)
+    if (text) showBubbleText(text)
+  }
+  lastStats = { mood: Number(next.mood) || 0, satiety: Number(next.satiety) || 0 }
+}
+
+async function loadStatsOnce() {
+  if (!petId) return
+  try {
+    const r = await window.petAPI.statsGet(petId)
+    if (r && r.ok) applyPetExpression(r.state, { bubble: false })
+  } catch { /* 老包没有数值时忽略 */ }
+}
+
 async function statsPatch(delta: StatsDelta): Promise<StatsResponse | null> {
   if (!petId) return null
   try {
     const api = window.petAPI
     if (typeof api.statsPatch !== 'function') return null
     const r = await api.statsPatch(petId, delta)
+    if (r && r.ok) applyPetExpression(r.state)
     return r && r.ok ? r : null
   } catch (e) {
     console.warn('[PetPet] 数值更新失败（不影响互动）', e)
@@ -821,12 +867,15 @@ function expandBigBubble() {
 async function completeCheckin() {
   const cur = currentOf(reminderQueue)
   if (!cur) return
+  // 先回执：主进程据此取消"1 分钟没点就扣分"的计时器
+  try { window.petAPI.reminderAck(cur.id) } catch { /* 老版本没有这个通道 */ }
   reminderQueue = dismiss(reminderQueue)
   const r = await statsPatch({ checkin: true })
   const more = pendingCount(reminderQueue)
   renderBigBubble()
   if (more === 0) {
-    showBubbleText(r ? '吃饱啦，谢谢主人！' : '收到啦！', 'feed')
+    const urgent = urgentBubble()
+    showBubbleText(urgent || (r ? '吃饱啦，谢谢主人！' : '收到啦！'), 'feed')
   }
 }
 
@@ -883,11 +932,21 @@ function setupUI() {
   // 收起成小胶囊后点一下可展开
   document.getElementById('big-bubble')?.addEventListener('click', () => expandBigBubble())
 
+  void loadStatsOnce() // 读取当前数值 → 应用瘫倒/跳跃/乌云/爱心
+
   // 专注钩子（B 组通过 focus:state 触发，本组只负责表现）
   window.petAPI.onFocusChange((entering) => setFocusState(entering))
   // 专注结束：主进程发一条唤醒气泡（文案由主进程给，渲染层不硬编码）
   window.petAPI.onBubble((text) => {
     if (text) showBubbleText(text)
+  })
+  // 喂食/喂水提醒 1 分钟内没点「已完成」：主进程扣分并广播，这里同步队列与表现
+  window.petAPI.onReminderMissed((info) => {
+    reminderQueue = dismiss(reminderQueue, info.id)
+    renderBigBubble()
+    if (info.state) applyPetExpression(info.state)
+    shakePet()
+    showBubbleText('等太久啦…有点难过', 'water')
   })
   void refreshPrefs()
 }

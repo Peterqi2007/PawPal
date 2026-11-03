@@ -24,6 +24,9 @@ contextBridge.exposeInMainWorld('petAPI', {
     patch: (petId, delta) => ipcRenderer.invoke('stats:patch', petId, delta)
   },
   onReminderFire: (cb) => ipcRenderer.on('reminder:fire', (_e, r) => cb(r)),
+  // 喂食/喂水提醒的"1 分钟内点了[已完成]"回执：主进程据此取消漏点扣分
+  reminderAck: (id) => ipcRenderer.send('reminder:ack', id),
+  onReminderMissed: (cb) => ipcRenderer.on('reminder:missed', (_e, info) => cb(info)),
   // Part A：数值 / 偏好 / 专注钩子 / 音效上报
   statsGet: (petId) => ipcRenderer.invoke('stats:get', petId),
   statsPatch: (petId, delta) => ipcRenderer.invoke('stats:patch', petId, delta),

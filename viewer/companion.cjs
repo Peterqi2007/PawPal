@@ -76,13 +76,14 @@ function normalizeDelta(delta) {
   if (!delta || typeof delta !== 'object') {
     return { toDelta: {}, rejected: ['delta 必须是对象'] }
   }
-  const allowed = ['feed', 'checkin', 'mood', 'satiety']
+  const allowed = ['feed', 'checkin', 'mood', 'satiety', 'missPenalty']
   for (const key of Object.keys(delta)) {
     if (!allowed.includes(key)) rejected.push(key)
   }
   const toDelta = {}
   if (delta.feed === true) toDelta.satiety = (toDelta.satiety || 0) + FEED_SATIETY_GAIN
   if (delta.checkin === true) toDelta.checkin = true
+  if (delta.missPenalty === true) toDelta.missPenalty = true
   if (typeof delta.satiety === 'number' && Number.isFinite(delta.satiety)) {
     toDelta.satiety = (toDelta.satiety || 0) + delta.satiety
   }

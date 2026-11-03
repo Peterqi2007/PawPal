@@ -151,7 +151,8 @@ registerStatusFocus({ app, screen, BrowserWindow, ipcMain, getPet, getStats, not
 
 - 文件：`~/.petpet/state/<petId>.json`，`mode: 0o600`，原子写（temp + rename）
 - 结构：`{ date: '2026-11-03', mood: 60, satiety: 50, checkins: 0, moodToday: 0, deviceId: '<uuid>' }`
-- 规则：本地日期跨天重置；只升不降、上限 100；心情每日上限 15
+- 规则：本地日期跨天重置（初始 饱腹 50 / 心情 60）；上限 100；心情摸头每日 +15 封顶；
+  打卡每次 +20 饱腹、当天首次 +10 心情；喂食/喂水提醒 1 分钟未点 → 心情/饱腹各 -30（保底 0）
 - **不用 localStorage**：主进程要读（托盘、胶囊、专注），多窗口一致性靠 IPC
 - IPC：`stats:get(petId)` / `stats:patch(petId, delta)` → **返回新状态**，调用方只信返回值
 - A 组不得直接读写该文件

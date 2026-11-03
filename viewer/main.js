@@ -1498,6 +1498,52 @@ ipcMain.handle('reminder:del', (_evt, id) => {
   return { ok: existed }
 })
 
+// 喂食/喂水提醒的"漏点惩罚"：1 分钟内没点 [已完成] → 心情/饱腹各 -30（保底 0）
+const REMINDER_MISS_MS = 60 * 1000
+const missTimers = new Map()
+
+function clearMissTimer(id) {
+  const t = missTimers.get(id)
+  if (t) {
+    clearTimeout(t)
+    missTimers.delete(id)
+  }
+}
+
+function scheduleMissCheck(id) {
+  clearMissTimer(id)
+  const timer = setTimeout(() => {
+    missTimers.delete(id)
+    missReminder(id)
+  }, REMINDER_MISS_MS)
+  if (timer.unref) timer.unref()
+  missTimers.set(id, timer)
+}
+
+function missReminder(id) {
+  if (!currentPetId) return
+  try {
+    const r = petCompanion.statsStore.patch(currentPetId, { missPenalty: true })
+    if (!r || !r.ok) {
+      console.error('[PetPet][数值] 漏点扣分失败:', r && r.error)
+      return
+    }
+    console.log('[PetPet][数值] 提醒 #' + id + ' 未被点击 → 心情/饱腹各 -30，现在', JSON.stringify({
+      mood: r.state.mood, satiety: r.state.satiety
+    }))
+    if (statusFocus) statusFocus.refreshCapsule()
+    send('reminder:missed', { id, state: { mood: r.state.mood, satiety: r.state.satiety } })
+  } catch (e) {
+    console.error('[PetPet][数值] 漏点扣分异常:', e && e.message)
+  }
+}
+
+ipcMain.on('reminder:ack', (_evt, id) => {
+  if (!id) return
+  clearMissTimer(id)
+  console.log('[PetPet][数值] 提醒 #' + id + ' 已点击，取消漏点计时')
+})
+
 function fireReminder(id) {
   const r = reminders.get(id)
   if (!r) return
@@ -1511,6 +1557,8 @@ function fireReminder(id) {
     } catch (e) { /* 无通知权限时忽略 */ }
   }
   send('reminder:fire', { id, text: r.text, kind: r.kind || 'custom', sound: petCompanion.soundEnabled() })
+  // 只有喂食/喂水会扣分；自定义提醒不惩罚（避免"喝水提醒"和"开会提醒"一视同仁）
+  if (r.kind === 'feed' || r.kind === 'water') scheduleMissCheck(id)
   appendActivity(currentPetId || '', { mood: '提醒', text: `${currentPetName || '宠物'}提醒你：` + r.text })
   if (r.repeat === 'daily') {
     r.at += 24 * 3600 * 1000
@@ -1637,6 +1685,12 @@ app.whenReady().then(() => {
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
+})
+
+// 退出前清掉"漏点扣分"计时器，避免退出瞬间再扣一次
+app.on('before-quit', () => {
+  missTimers.forEach((t) => clearTimeout(t))
+  missTimers.clear()
 })
 
 app.on('window-all-closed', () => {

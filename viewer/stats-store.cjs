@@ -17,9 +17,10 @@ const SCORE_MIN = 0
 const SCORE_MAX = 100
 const PAT_MOOD = 5 // 摸头 +5 心情
 const MOOD_DAILY_CAP = 15 // 摸头每日最多 +15
-const CHECKIN_SATIETY = 20 // 打卡 +20 饱腹
-const CHECKIN_MOOD = 10 // 打卡 +10 心情
-const CHECKIN_SCORING = 3 // 每日前 3 次打卡计分
+const CHECKIN_SATIETY = 20 // 打卡（喂食/喂水）每次 +20 饱腹
+const CHECKIN_MOOD = 10 // 每日**第一次**打卡 +10 心情
+const CHECKIN_SCORING = 3 // 胶囊上展示 min(n,3)/3 的口径
+const MISS_PENALTY = 30 // 喂食/喂水提醒 1 分钟内没点「已完成」→ 心情/饱腹各 -30（保底 0）
 const FEED_SATIETY = 20 // 喂食 +20 饱腹
 
 // 本地时区的 YYYY-MM-DD（用户按自己的"今天"重置，不用 UTC）
@@ -64,10 +65,11 @@ function applyDelta(state, delta) {
   const out = { ...state }
   const d = delta && typeof delta === 'object' ? delta : {}
 
-  // 打卡：前 3 次计分，第 4 次起只计数（不惩罚，也不再加分）
+  // 打卡（喂食/喂水都算）：每次 +20 饱腹；只有当天第一次 +10 心情
+  // （口径见 docs/handoff/B-状态与专注.md：防止"连点打卡刷心情"）
   if (d.checkin) {
-    if (out.checkins < CHECKIN_SCORING) {
-      out.satiety = clampScore(out.satiety + CHECKIN_SATIETY)
+    out.satiety = clampScore(out.satiety + CHECKIN_SATIETY)
+    if (Math.max(0, Math.floor(out.checkins)) === 0) {
       out.mood = clampScore(out.mood + CHECKIN_MOOD)
     }
     out.checkins = Math.max(0, Math.floor(out.checkins)) + 1
@@ -84,6 +86,12 @@ function applyDelta(state, delta) {
     } else if (Number.isFinite(want) && want < 0) {
       out.mood = clampScore(out.mood + want)
     }
+  }
+
+  // 漏点提醒的惩罚：心情/饱腹各 -30，保底 0（不吃心情每日额度，也不触发封顶提示）
+  if (d.missPenalty) {
+    out.mood = clampScore(out.mood - MISS_PENALTY)
+    out.satiety = clampScore(out.satiety - MISS_PENALTY)
   }
 
   // 饱腹：喂食 / 喝水走这里
@@ -185,6 +193,7 @@ function createStatsStore(options = {}) {
 }
 
 module.exports = {
+  MISS_PENALTY,
   createStatsStore,
   applyDelta,
   normalizeState,

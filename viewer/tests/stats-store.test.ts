@@ -71,11 +71,32 @@ describe('applyDelta 纯函数', () => {
     expect(next.checkins).toBe(1)
   })
 
-  it('第 4 次打卡只计数、不再加分', () => {
+  it('每次打卡都 +20 饱腹；当天第 2 次起不再加心情', () => {
     const next = applyDelta({ satiety: 70, mood: 80, checkins: 3, moodToday: 0 }, { checkin: true })
     expect(next.checkins).toBe(4)
-    expect(next.satiety).toBe(70)
-    expect(next.mood).toBe(80)
+    expect(next.satiety).toBe(90)   // 打卡一直有饱腹收益（喂食/喂水都算）
+    expect(next.mood).toBe(80)      // 但心情只在当天第一次给
+  })
+
+  it('当天第一次打卡才 +10 心情', () => {
+    const first = applyDelta({ satiety: 50, mood: 60, checkins: 0, moodToday: 0 }, { checkin: true })
+    expect(first.satiety).toBe(70)
+    expect(first.mood).toBe(70)
+    const second = applyDelta(first, { checkin: true })
+    expect(second.satiety).toBe(90)
+    expect(second.mood).toBe(70)
+  })
+
+  it('漏点惩罚：心情/饱腹各 -30，保底 0', () => {
+    const r = applyDelta({ satiety: 100, mood: 20, checkins: 1, moodToday: 0 }, { missPenalty: true })
+    expect(r.satiety).toBe(70)
+    expect(r.mood).toBe(0)      // 20 - 30 → 夹到 0，不出现负数
+    expect(r.checkins).toBe(1)  // 打卡次数不受影响
+  })
+
+  it('漏点惩罚不吃心情每日额度（moodToday 不变）', () => {
+    const r = applyDelta({ satiety: 80, mood: 60, checkins: 0, moodToday: 5 }, { missPenalty: true })
+    expect(r.moodToday).toBe(5)
   })
 
   it('非法 delta（非对象 / 非数字）不改变状态', () => {
@@ -156,14 +177,15 @@ describe('createStatsStore 落盘', () => {
     expect(todayStr(new Date(2026, 10, 4, 0, 1))).toBe('2026-11-04')
   })
 
-  it('连续签到心情不越过 100', () => {
+  it('连续签到：饱腹到 100 封顶，心情只在第一次 +10', () => {
     const store = createStatsStore({ baseDir: dir })
     store.get('runtol')
     store.patch('runtol', { checkin: true })
     store.patch('runtol', { checkin: true })
     store.patch('runtol', { checkin: true })
     const s = store.get('runtol')
-    expect(s.mood).toBe(90)
-    expect(s.satiety).toBe(100)
+    expect(s.mood).toBe(70)     // 60 + 10（仅首次）
+    expect(s.satiety).toBe(100) // 50 → 70 → 90 → 100（封顶）
+    expect(s.checkins).toBe(3)
   })
 })
