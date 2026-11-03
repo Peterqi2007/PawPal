@@ -7,3 +7,6 @@ release/
 .venv/
 .pytest_cache/
 .idea/
+
+# 大体积设计稿/导出件不入库（仓库有 25MB 体积红线，见 docs/12 §N-5）；需要传阅走 issue 附件
+docs/*.pdf

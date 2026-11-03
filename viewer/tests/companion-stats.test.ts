@@ -116,14 +116,17 @@ describe('applyStatsPatch 数值规则', () => {
     expect(r.applied.mood).toBe(2)
   })
 
-  it('未知字段/非法值被拒绝且不改数值', () => {
+  it('未知字段被拒绝且不改数值', () => {
     const r = applyStatsPatch(base(), { feed: true, hacker: 999 } as never)
     expect(r.rejected).toContain('hacker')
     expect(r.state.satiety).toBe(SATIETY_INIT + FEED_SATIETY_GAIN)
+  })
 
+  it('负向心情：合并 Part B 规则后允许，且不占每日摸头额度', () => {
     const neg = applyStatsPatch(base(), { mood: -10 })
-    expect(neg.rejected).toContain('mood')
-    expect(neg.state.mood).toBe(MOOD_INIT)
+    expect(neg.rejected).not.toContain('mood')
+    expect(neg.state.mood).toBe(MOOD_INIT - 10)
+    expect(neg.state.moodToday).toBe(0)
   })
 
   it('delta 为 null 时不改动', () => {

@@ -16,6 +16,11 @@ contextBridge.exposeInMainWorld('petAPI', {
   onReset: (cb) => ipcRenderer.on('view:reset', () => cb()),
   onTestAction: (cb) => ipcRenderer.on('test:action', (_e, name) => cb(name)),
   setReminder: (spec) => ipcRenderer.invoke('reminder:set', spec),
+  // B-1 数值系统：饱腹 / 心情 / 打卡（返回值即最新状态，调用方只信返回值）
+  stats: {
+    get: (petId) => ipcRenderer.invoke('stats:get', petId),
+    patch: (petId, delta) => ipcRenderer.invoke('stats:patch', petId, delta)
+  },
   onReminderFire: (cb) => ipcRenderer.on('reminder:fire', (_e, r) => cb(r)),
   // Part A：数值 / 偏好 / 专注钩子 / 音效上报
   statsGet: (petId) => ipcRenderer.invoke('stats:get', petId),

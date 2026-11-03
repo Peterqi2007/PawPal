@@ -1447,6 +1447,13 @@ const openReminderArg = process.argv.includes('--open-reminder')
 // 演示/验证用：--open-refs 启动后自动打开参考图库（等效托盘菜单点击）
 const openRefsArg = process.argv.includes('--open-refs')
 
+// ==== SECTION: B / status-focus ====
+// B-1 数值系统：饱腹 / 心情 / 打卡。状态落 ~/.petpet/state/<petId>.json（契约 C2）。
+// 拆分后的职责：规则与原子写由 viewer/stats-store.cjs 提供（B 组交付），
+// IPC 注册在 A 段（viewer/companion.cjs 的 registerPetCompanion，见文件上方 SECTION A），
+// 这里**不再重复 handle**——同一 channel 注册两次 Electron 会直接抛错，重启即崩。
+// 数值相关的调用一律走 stats:get / stats:patch 两个通道（A 的渲染层与 B 的胶囊共用）。
+
 app.whenReady().then(() => {
   loadReminders()           // P0-5：启动即载入持久化提醒（此前只定义了函数、从未调用 → 重启丢提醒）
   registerPetpetProtocol()  // N-3：自定义协议（CSP 已放行 petpet:）
