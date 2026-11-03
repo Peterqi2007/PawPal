@@ -65,6 +65,7 @@
       "focus.html",
       "focus.css",
       "focus.js",
+      "window-fit.cjs",
       "dist/**/*",
       "index.html",
       "!node_modules/**/*"

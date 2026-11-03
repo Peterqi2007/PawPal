@@ -6,6 +6,8 @@ contextBridge.exposeInMainWorld('petAPI', {
   loadPet: (petId) => ipcRenderer.invoke('pet:load', petId),
   getFile: (petId, relPath) => ipcRenderer.invoke('pet:file', petId, relPath),
   setWindowSize: (w, h) => ipcRenderer.send('view:setSize', w, h),
+  // 缩放：主进程按真实 bounds 改尺寸并夹回工作区，返回落地后的窗口矩形
+  scaleTo: (w, h) => ipcRenderer.invoke('view:scaleTo', w, h),
   moveWindow: (x, y) => ipcRenderer.send('view:move', x, y),
   setIgnoreMouse: (ignore, forward) => ipcRenderer.send('pet:setIgnoreMouse', ignore, forward),
   getWindowPosition: () => ipcRenderer.invoke('view:getPos'),

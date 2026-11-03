@@ -16,6 +16,7 @@ const {
 } = require('./seedance-client.cjs')
 const { buildActionSpec, safeSlug, DEFAULT_CELL, DEFAULT_FRAMES, greenRatioOfBitmap } = require('./animator.cjs')
 const { assemblePet, collectSheets, safeId } = require('./pet-assembler.cjs')
+const { clampToWorkArea } = require('./window-fit.cjs') // 窗口/菜单落位夹回工作区
 const companion = require('./companion.cjs') // Part A：数值/偏好/persona 回写
 
 const PETS_ROOT = path.join(app.getPath('home'), '.petpet', 'pets')
@@ -163,14 +164,25 @@ const petCompanion = companion.registerPetCompanion({
 // ==== SECTION: A / end ====
 
 function createWindow() {
-  const { width, height } = screen.getPrimaryDisplay().workAreaSize
+  const workArea = screen.getPrimaryDisplay().workArea
+  const { width, height } = workArea
   const saved = loadUiState()
+  // 保存的位置可能来自"窗口尺寸还是旧值"的时候，直接夹回工作区，避免桌宠开场就在屏幕外
+  const startPos = clampToWorkArea(
+    {
+      x: saved.x ?? Math.round(width - 380),
+      y: saved.y ?? Math.round(height - 420),
+      width: 320,
+      height: 320
+    },
+    workArea
+  )
 
   mainWindow = new BrowserWindow({
     width: 320,
     height: 320,
-    x: saved.x ?? Math.round(width - 380),
-    y: saved.y ?? Math.round(height - 420),
+    x: startPos.x,
+    y: startPos.y,
     transparent: true,
     frame: false,
     alwaysOnTop: true,
@@ -372,7 +384,14 @@ ipcMain.handle('menu:showContext', (_evt, x, y) => {
   template.push({ type: 'separator' })
   template.push({ label: '↺ 重置大小', click: () => send('view:reset') })
   const menu = Menu.buildFromTemplate(template)
-  menu.popup({ x: Math.round(x), y: Math.round(y) })
+
+  // 落位说明（2026-11-03 实测踩坑）：
+  // 在 Windows 上把 x/y 传给 popup 时，Electron 会按"缩放后的客户区"去解释这两个值，
+  // 结果菜单被顶到屏幕右下角、右/下边缘被切掉（用户报的就是这个）。
+  // 不传坐标时由系统在**当前光标处**弹出，并自动在贴近屏幕边缘时向内翻转——
+  // 右键菜单本来就该跟着光标（也就是跟着桌宠）出现，所以这里不再自己算坐标。
+  console.log('[PetPet][菜单]', `点击(${Math.round(x)},${Math.round(y)}) → 交给系统按光标定位`)
+  menu.popup({ window: mainWindow })
 })
 
 function toggleWindow() {
@@ -543,6 +562,38 @@ function registerPetpetProtocol() {
 }
 
 // 窗口尺寸变化（渲染进程请求调整窗口大小）
+function workAreaOf(win) {
+  const b = win.getBounds()
+  const center = { x: Math.round(b.x + b.width / 2), y: Math.round(b.y + b.height / 2) }
+  return screen.getDisplayNearestPoint(center).workArea
+}
+
+// 缩放：以窗口中心为锚点改尺寸，并把结果夹回工作区。
+// 必须用 resizable(true) 临时解锁：实测 resizable:false 的窗口在 Windows 上 setSize/setBounds 会被忽略，
+// 于是渲染层以为窗口变了、实际没变，位置一层层偏出去（桌宠最后跑到屏幕外、右键菜单跟着被切）。
+ipcMain.handle('view:scaleTo', (_evt, w, h) => {
+  if (!mainWindow || mainWindow.isDestroyed()) return null
+  const b = mainWindow.getBounds()
+  const nw = Math.max(60, Math.round(w))
+  const nh = Math.max(60, Math.round(h))
+  const target = clampToWorkArea(
+    {
+      x: Math.round(b.x + (b.width - nw) / 2),
+      y: Math.round(b.y + (b.height - nh) / 2),
+      width: nw,
+      height: nh
+    },
+    workAreaOf(mainWindow)
+  )
+  const wasResizable = mainWindow.isResizable()
+  if (!wasResizable) mainWindow.setResizable(true)
+  mainWindow.setBounds(target)
+  if (!wasResizable) mainWindow.setResizable(false)
+  const after = mainWindow.getBounds()
+  console.log('[PetPet][缩放]', `${b.width}x${b.height}@(${b.x},${b.y})`, '→', `${after.width}x${after.height}@(${after.x},${after.y})`)
+  return after
+})
+
 ipcMain.on('view:setSize', (_evt, w, h) => {
   if (!mainWindow || mainWindow.isDestroyed()) return
   mainWindow.setSize(Math.max(60, Math.round(w)), Math.max(60, Math.round(h)))
@@ -551,7 +602,12 @@ ipcMain.on('view:setSize', (_evt, w, h) => {
 // 窗口移动（拖拽宠物）
 ipcMain.on('view:move', (_evt, x, y) => {
   if (!mainWindow || mainWindow.isDestroyed()) return
-  mainWindow.setPosition(Math.round(x), Math.round(y))
+  const b = mainWindow.getBounds()
+  const target = clampToWorkArea(
+    { x: Math.round(x), y: Math.round(y), width: b.width, height: b.height },
+    workAreaOf(mainWindow)
+  )
+  mainWindow.setPosition(target.x, target.y)
 })
 
 // 鼠标穿透（借鉴 bitnp：透明区穿透，宠物区交互；forward=true 穿透时仍收 mousemove）

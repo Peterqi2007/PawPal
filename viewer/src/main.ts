@@ -68,6 +68,7 @@ declare global {
       loadPet: (id: string) => Promise<PetJson>
       getFile: (id: string, rel: string) => Promise<{ dataUrl?: string; error?: string }>
       setWindowSize: (w: number, h: number) => void
+      scaleTo: (w: number, h: number) => Promise<{ x: number; y: number; width: number; height: number } | null>
       moveWindow: (x: number, y: number) => void
       setIgnoreMouse: (ignore: boolean, forward?: boolean) => void
       getWindowPosition: () => Promise<{ x: number; y: number }>
@@ -502,20 +503,23 @@ async function applyScale() {
   const act: PetActionSpec = pet?.actions?.[currentAction] || { frames: 0 }
   const actScale = act.scale || 1
 
-  // 窗口 = 初始尺寸 × baseScale（与动作无关）
-  const newW = Math.max(60, Math.round(WINDOW_W * baseScale))
-  const newH = Math.max(60, Math.round(WINDOW_H * baseScale))
+  // 窗口 = 初始尺寸 × baseScale（与动作无关），但**不缩到基准尺寸以下**：
+  // 提醒面板 / 大气泡这些 UI 需要 ~304px 宽度，窗口一缩小就会被裁掉。
+  // 放大仍然生效（>1 时窗口跟着长），缩小只缩精灵、保留足够画布。
+  const newW = Math.max(WINDOW_W, Math.round(WINDOW_W * baseScale))
+  const newH = Math.max(WINDOW_H, Math.round(WINDOW_H * baseScale))
   sprite.scale.set(baseScale * fit * actScale)
   sprite.position.set(newW / 2, newH / 2)
 
-  const newX = Math.round(curWinX + (curWinW - newW) / 2)
-  const newY = Math.round(curWinY + (curWinH - newH) / 2)
-  window.petAPI.moveWindow(newX, newY)
-  window.petAPI.setWindowSize(newW, newH)
-  curWinX = newX
-  curWinY = newY
-  curWinW = newW
-  curWinH = newH
+  // 缩放交给主进程：它知道窗口的真实 bounds，按中心缩放后夹回工作区并回传结果。
+  // 渲染层不再自己算位置——之前正是"渲染层假设的尺寸"和"实际窗口"不一致，把窗口推到了屏幕外。
+  const applied = await window.petAPI.scaleTo(newW, newH)
+  if (applied) {
+    curWinX = applied.x
+    curWinY = applied.y
+    curWinW = applied.width
+    curWinH = applied.height
+  }
 }
 
 function applyZoom(factor: number) {
