@@ -109,7 +109,8 @@ describe('assertNoEscape', () => {
   it('正常目录全部文件通过', () => {
     expect(assertNoEscape(makePack())).toEqual([])
   })
-  it('检测符号链接逃逸', () => {
+  // Windows 下 symlink 需管理员权限（EPERM），POSIX 才能真造出逃逸链接
+  it.skipIf(process.platform === 'win32')('检测符号链接逃逸', () => {
     const dir = makePack()
     fs.symlinkSync('/etc', path.join(dir, 'evil-link'))
     const off = assertNoEscape(dir)

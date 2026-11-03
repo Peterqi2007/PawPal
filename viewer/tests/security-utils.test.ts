@@ -63,13 +63,14 @@ describe('isSafeUnderRoot（路径穿越防护）', () => {
     expect(isSafeUnderRoot(path.join(root, 'dog', 'nope.png'), root)).toBe(false)
   })
 
-  it('符号链接指向包外拒绝', () => {
+  // Windows 下创建符号链接需要管理员权限（EPERM），该用例只在 POSIX 上可跑
+  it.skipIf(process.platform === 'win32')('符号链接指向包外拒绝', () => {
     const evil = path.join(root, 'dog', 'evil-link')
     fs.symlinkSync('/etc', evil)
     expect(isSafeUnderRoot(evil, root)).toBe(false)
   })
 
-  it('包内符号链接（指向包内真实文件）通过', () => {
+  it.skipIf(process.platform === 'win32')('包内符号链接（指向包内真实文件）通过', () => {
     const link = path.join(root, 'dog', 'idle', 'link.png')
     fs.symlinkSync(path.join(root, 'dog', 'idle', 'a.png'), link)
     expect(isSafeUnderRoot(link, root)).toBe(true)
