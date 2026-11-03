@@ -213,6 +213,13 @@ docs/
 | real-photo-face/full/full2.jpg | 真实照片（半身正面/全身卧姿/正面端坐） |
 | setup-image.png | 3D 设定图（主人核实的锚点） |
 
+**开发自测包 `dev-pet`**（`examples/dev-pet/`）——**8 动作齐全的自测 fixture**（0.5MB、256px 小格子、全程透明底）：
+
+- 用途：客户端开发（交互/数值/提醒/专注）与 CI 自测；**不是正式美术素材**
+- 内容：`idle` + `belly` 为真实帧（取自 `dingdang-demo`），`sleep`/`stretch`/`sniff`/`wiggle`/`run`/`poop` 为几何变换派生的占位动画
+- 为什么单独做一个：现有 demo 包只有 2–3 个动作、**没有 `wiggle`**（提醒到点要播的动作），且单表 655px 偏重
+- 重新生成：`python examples/dev-pet/make.py`（可复现），详见 [examples/dev-pet/README.md](examples/dev-pet/README.md)
+
 > 动画素材由 AI 生成（即梦），版权归用户所有；发布时请保留平台 AI 标识要求。
 
 ---

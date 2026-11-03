@@ -1,0 +1,150 @@
+{
+  "version": 3,
+  "id": "dev-pet",
+  "name": "自测狗",
+  "style": "illustration",
+  "theme": "orange",
+  "persona": "温柔",
+  "bubbles": [
+    "汪！",
+    "摸摸我～",
+    "今天也要开心哦！"
+  ],
+  "cellWidth": 256,
+  "cellHeight": 256,
+  "temperament": {
+    "activity": 0.5,
+    "clinginess": 0.5,
+    "curiosity": 0.5,
+    "independence": 0.5
+  },
+  "actions": {
+    "idle": {
+      "sprite": "idle/idle_sheet.webp",
+      "frames": 8,
+      "fps": 5,
+      "loop": true,
+      "weight": 100,
+      "frameWidth": 256,
+      "frameHeight": 256,
+      "scale": 1,
+      "label": "待机",
+      "diary": {
+        "mood": "安逸",
+        "text": "{name}叼着鳄鱼玩具打盹，安静等主人回来。"
+      }
+    },
+    "sleep": {
+      "sprite": "sleep/sleep_sheet.webp",
+      "frames": 8,
+      "fps": 5,
+      "loop": true,
+      "weight": 10,
+      "frameWidth": 256,
+      "frameHeight": 256,
+      "scale": 1,
+      "label": "睡觉",
+      "diary": {
+        "mood": "安逸",
+        "text": "{name}蜷成一团睡着了，呼噜声轻轻的。"
+      },
+      "transitions": {
+        "stretch": 80,
+        "idle": 20
+      }
+    },
+    "stretch": {
+      "sprite": "stretch/stretch_sheet.webp",
+      "frames": 8,
+      "fps": 5,
+      "loop": true,
+      "weight": 10,
+      "frameWidth": 256,
+      "frameHeight": 256,
+      "scale": 1,
+      "label": "伸懒腰",
+      "diary": {
+        "mood": "舒坦",
+        "text": "{name}伸了个大大的懒腰，爪子张得开花。"
+      },
+      "transitions": {
+        "idle": 100
+      }
+    },
+    "sniff": {
+      "sprite": "sniff/sniff_sheet.webp",
+      "frames": 8,
+      "fps": 5,
+      "loop": true,
+      "weight": 20,
+      "frameWidth": 256,
+      "frameHeight": 256,
+      "scale": 1,
+      "label": "嗅闻",
+      "diary": {
+        "mood": "好奇",
+        "text": "{name}凑近嗅了嗅，鼻头湿漉漉的。"
+      }
+    },
+    "wiggle": {
+      "sprite": "wiggle/wiggle_sheet.webp",
+      "frames": 8,
+      "fps": 5,
+      "loop": true,
+      "weight": 20,
+      "frameWidth": 256,
+      "frameHeight": 256,
+      "scale": 1,
+      "label": "撒娇",
+      "diary": {
+        "mood": "开心",
+        "text": "{name}扭着屁股撒欢，尾巴摇成小风扇。"
+      }
+    },
+    "run": {
+      "sprite": "run/run_sheet.webp",
+      "frames": 8,
+      "fps": 5,
+      "loop": true,
+      "weight": 10,
+      "frameWidth": 256,
+      "frameHeight": 256,
+      "scale": 1,
+      "label": "奔跑",
+      "diary": {
+        "mood": "兴奋",
+        "text": "{name}嗖地窜了出去，一溜烟就没影了。"
+      }
+    },
+    "belly": {
+      "sprite": "belly/belly_sheet.webp",
+      "frames": 8,
+      "fps": 5,
+      "loop": true,
+      "weight": 10,
+      "frameWidth": 256,
+      "frameHeight": 256,
+      "scale": 1,
+      "label": "露肚躺",
+      "diary": {
+        "mood": "惬意",
+        "text": "{name}翻出肚皮晒太阳，毫无防备。"
+      }
+    },
+    "poop": {
+      "sprite": "poop/poop_sheet.webp",
+      "frames": 8,
+      "fps": 5,
+      "loop": true,
+      "weight": 5,
+      "frameWidth": 256,
+      "frameHeight": 256,
+      "scale": 1,
+      "label": "拉粑粑",
+      "diary": {
+        "mood": "心虚",
+        "text": "{name}先转着圈圈踩好位置，解决完就撒欢跑开了。"
+      }
+    }
+  }
+}
