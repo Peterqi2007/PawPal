@@ -295,7 +295,8 @@ html, body {
   transform-origin: 50% 82%;
   transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
 }
-.pet-stage.pp-jump .pet-canvas { animation: pp-happy-jump 0.55s ease-in-out infinite; }
+/* 跳跃只在"刚吃饱那一刻"蹦 3 下（有限次）；无限循环会变成一直在抖（用户 2026-11-03 报障） */
+.pet-stage.pp-jump .pet-canvas { animation: pp-happy-jump 0.6s ease-in-out 3; }
 @keyframes pp-happy-jump {
   0%, 100% { transform: translateY(0) scale(1); }
   35%      { transform: translateY(-7px) scale(1.02); }

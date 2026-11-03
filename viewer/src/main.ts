@@ -9,7 +9,7 @@ import { effectiveWeight } from './temperament' // V2-A: 气质调制器（2026-
 // Part A：陪伴交互（左键分区 / 人格气泡 / 提醒三件套）
 import { resolveHit, buildAlphaMap, toLayoutPoint } from './hit-test'
 import { pickBubble, type BubbleScene } from './persona-bubbles'
-import { expressionOf, thresholdBubble } from './pet-expression'
+import { expressionOf, thresholdBubble, BUBBLE_HAPPY_FULL } from './pet-expression'
 import { isClickGesture } from './click-guard'
 import { heartBurstSpec, HEART_BURST_MS, HEART_GLYPH, heartEnd, heartOpacity } from './heart-burst'
 import {
@@ -696,6 +696,18 @@ function shakePet() {
 /** 数值更新：B 组未就绪时静默降级（不弹错、不打断互动） */
 // ===== 数值 → 表现（饱腹<30 瘫倒、>80 跳跃；心情<30 乌云、>80 爱心）=====
 let lastStats: { mood: number; satiety: number } | null = null
+let jumpTimer = 0
+
+/** 开心跳跃：只在"刚跨过 80"时蹦 3 下，然后停（常驻动画会变成一直在抖） */
+function playJumpBurst() {
+  const stage = document.getElementById('petStage')
+  if (!stage) return
+  stage.classList.remove('pp-jump')
+  void stage.offsetWidth // 强制重排，保证同名动画能重播
+  stage.classList.add('pp-jump')
+  window.clearTimeout(jumpTimer)
+  jumpTimer = window.setTimeout(() => stage.classList.remove('pp-jump'), 1900)
+}
 
 // ===== 爱心喷发（心情 > 80）：10 秒内从头心持续喷出爱心，飞出去的过程中快速淡出 =====
 let heartTimers: number[] = []
@@ -770,8 +782,8 @@ function applyPetExpression(next: { mood?: number; satiety?: number } | null | u
   const expr = expressionOf(next)
   const stage = document.getElementById('petStage')
   if (stage) {
+    // 瘫倒/背对是"状态姿态"，可以常驻；跳跃是"事件表现"，只在跨过阈值时蹦一下
     stage.classList.toggle('pp-collapsed', expr.collapsed)
-    stage.classList.toggle('pp-jump', expr.jump)
     stage.classList.toggle('pp-sad', expr.moodFace === 'sad')
   }
   const overlay = document.getElementById('pet-overlay')
@@ -783,10 +795,9 @@ function applyPetExpression(next: { mood?: number; satiety?: number } | null | u
   if (expr.overlay === 'hearts') startHeartBurst()
   else if (heartBurstOn) stopHeartBurst()
   // 只在"跨过阈值"时冒一次气泡，避免每次 +5 都刷屏
-  if (opts.bubble !== false) {
-    const text = thresholdBubble(lastStats, next)
-    if (text) showBubbleText(text)
-  }
+  const crossing = thresholdBubble(lastStats, next)
+  if (crossing === BUBBLE_HAPPY_FULL) playJumpBurst() // 刚吃饱：蹦 3 下
+  if (opts.bubble !== false && crossing) showBubbleText(crossing)
   lastStats = { mood: Number(next.mood) || 0, satiety: Number(next.satiety) || 0 }
 }
 
