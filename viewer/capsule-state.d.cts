@@ -15,6 +15,8 @@ export interface CapsuleModel {
   hasStats: boolean
   petId: string
   name: string
+  avatarUrl: string
+  avatarFrames: number
   dateLabel: string
   mood: number
   satiety: number
@@ -36,6 +38,7 @@ export declare function buildCapsuleModel(input: {
   stats?: CapsuleStats | null
   focus?: FocusSession | null
   pet?: { id?: string; name?: string } | null
+  avatar?: { url?: string; frames?: number } | null
   now?: number
   date?: Date
 }): CapsuleModel

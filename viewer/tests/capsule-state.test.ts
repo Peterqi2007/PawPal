@@ -78,6 +78,25 @@ describe('专注态', () => {
   })
 })
 
+describe('头像（精灵表首帧）', () => {
+  it('有头像时透传 url 与帧数', () => {
+    const m = buildCapsuleModel({
+      stats: STATS,
+      pet: PET,
+      avatar: { url: 'petpet://dev-pet/idle-sheet.png', frames: 12 },
+      now: NOW
+    })
+    expect(m.avatarUrl).toBe('petpet://dev-pet/idle-sheet.png')
+    expect(m.avatarFrames).toBe(12)
+  })
+
+  it('没有头像时给空串与 1（渲染层回退到爪印占位）', () => {
+    const m = buildCapsuleModel({ stats: STATS, pet: PET, now: NOW })
+    expect(m.avatarUrl).toBe('')
+    expect(m.avatarFrames).toBe(1)
+  })
+})
+
 describe('日期标签', () => {
   it('MM / DD 周X', () => {
     expect(dateLabel(new Date(2026, 10, 3))).toBe('11 / 03 周二')

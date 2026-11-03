@@ -35,6 +35,7 @@ function buildCapsuleModel(input = {}) {
   const stats = input.stats && typeof input.stats === 'object' ? input.stats : null
   const pet = input.pet && typeof input.pet === 'object' ? input.pet : null
   const focus = input.focus && typeof input.focus === 'object' ? input.focus : null
+  const avatar = input.avatar && typeof input.avatar === 'object' ? input.avatar : null
   const remain = focus ? remainingMs(focus.endAt, now) : 0
   const focusing = !!focus && remain > 0
 
@@ -48,6 +49,9 @@ function buildCapsuleModel(input = {}) {
     hasStats: !!stats,
     petId: pet && pet.id ? String(pet.id) : '',
     name: (pet && pet.name) || '还没有宠物',
+    // 头像：精灵表首帧（胶囊用 background-position 取第 1 帧，不需要新素材）
+    avatarUrl: avatar && avatar.url ? String(avatar.url) : '',
+    avatarFrames: avatar && Number(avatar.frames) > 0 ? Math.floor(Number(avatar.frames)) : 1,
     dateLabel: dateLabel(input.date instanceof Date ? input.date : new Date(now)),
     // 数值
     mood,

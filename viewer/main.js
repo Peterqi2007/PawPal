@@ -1494,6 +1494,19 @@ statusFocus = registerStatusFocus({
   BrowserWindow,
   ipcMain,
   getPet: () => (currentPetId ? { id: currentPetId, name: currentPetName || '宠物' } : null),
+  // 胶囊头像 = 当前宠物 idle 精灵表的首帧（不需要新素材）
+  getAvatar: () => {
+    if (!currentPetId) return null
+    try {
+      const json = JSON.parse(fs.readFileSync(path.join(PETS_ROOT, currentPetId, 'pet.json'), 'utf-8'))
+      const act = (json.actions && (json.actions.idle || json.actions[Object.keys(json.actions)[0]])) || null
+      const file = act && (act.file || act.sprite)
+      if (!file) return null
+      return { url: `petpet://${currentPetId}/${file}`, frames: Math.max(1, Number(act.frames) || 1) }
+    } catch (e) {
+      return null
+    }
+  },
   getStats: () => {
     if (!currentPetId) return null
     const r = petCompanion.statsStore.read(currentPetId)

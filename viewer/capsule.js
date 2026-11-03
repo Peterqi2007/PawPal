@@ -45,6 +45,15 @@ function render() {
       ? `心情 ${model.moodText} · 饱腹 ${model.satietyText}`
       : model.emptyHint
 
+  // 头像：精灵表首帧（background-size 按帧数铺开，只露第一格）
+  const avatarEl = $('avatar')
+  if (model.avatarUrl) {
+    avatarEl.style.backgroundImage = `url("${model.avatarUrl}")`
+    avatarEl.style.backgroundSize = `${model.avatarFrames * 100}% 100%`
+    avatarEl.style.backgroundPosition = '0 0'
+    avatarEl.innerHTML = ''
+  }
+
   const dot = $('status-dot')
   dot.className = `dot ${model.statusDot}`
 

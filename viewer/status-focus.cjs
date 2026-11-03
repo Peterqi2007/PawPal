@@ -43,7 +43,7 @@ const WAKE_BUBBLE = '休息一下，顺便给我换水吧。'
  * @param {() => void} [deps.onStateChange]                            专注态变化时重建菜单
  */
 function registerStatusFocus(deps) {
-  const { app, screen, BrowserWindow, ipcMain, getPet, getStats, notifyPet, onStateChange } = deps
+  const { app, screen, BrowserWindow, ipcMain, getPet, getStats, getAvatar, notifyPet, onStateChange } = deps
   const focusFile = path.join(app.getPath('home'), '.petpet', 'focus.json')
 
   let capsuleWindow = null
@@ -72,7 +72,12 @@ function registerStatusFocus(deps) {
 
   // ---------- 胶囊渲染 ----------
   function model() {
-    return buildCapsuleModel({ stats: getStats(), focus: session, pet: getPet() })
+    return buildCapsuleModel({
+      stats: getStats(),
+      focus: session,
+      pet: getPet(),
+      avatar: typeof getAvatar === 'function' ? getAvatar() : null
+    })
   }
 
   function sendToCapsule(channel, payload) {
