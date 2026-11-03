@@ -2,29 +2,47 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob: petpet:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' data: blob: petpet: ws://127.0.0.1:5173 http://127.0.0.1:5173; worker-src 'self' blob:" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob: petpet:; media-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' data: blob: petpet: ws://127.0.0.1:5173 http://127.0.0.1:5173; worker-src 'self' blob:" />
   <title>PetPet 桌宠</title>
   <link rel="stylesheet" href="./src/style.css" />
 </head>
 <body>
-  <canvas id="stage"></canvas>
+  <!-- 动效容器：呼吸/平移作用在这层，弹跳/抖动作用在 canvas（互不抢 transform） -->
+  <div class="pet-stage" id="petStage">
+    <canvas id="stage"></canvas>
+  </div>
   <div id="bubble" class="hidden" aria-live="polite" role="status"></div>
 
-  <!-- 方案B：提醒输入面板 -->
+  <!-- 提醒到点：头顶大气泡（带打卡按钮，取代旧的常显条） -->
+  <div id="big-bubble" class="hidden" role="alertdialog" aria-live="assertive" aria-label="提醒">
+    <div class="bb-head">
+      <span id="big-bubble-icon" class="bb-icon" aria-hidden="true">⏰</span>
+      <span id="big-bubble-text" class="bb-text"></span>
+    </div>
+    <div class="bb-foot">
+      <span id="big-bubble-mini" class="bb-mini" aria-hidden="true">⏰</span>
+      <span id="big-bubble-more" class="bb-more hidden"></span>
+      <button id="big-bubble-done" class="bb-btn" type="button">已完成</button>
+    </div>
+  </div>
+
+  <!-- 方案B：提醒输入面板 + 常用快捷入口 -->
   <div id="reminder-panel" class="panel hidden">
     <div class="panel-title">⏰ 提醒我</div>
+    <div class="reminder-quick" id="reminder-quick">
+      <button type="button" class="chip" data-kind="feed">🍚 喂食 · 1 小时后</button>
+      <button type="button" class="chip" data-kind="water">💧 喂水 · 1 小时后</button>
+    </div>
     <input id="reminder-input" type="text" placeholder="例：一分钟后提醒我喝水" spellcheck="false" />
     <div class="panel-hint">支持：5分钟后 / 今天下午5点 / 每天早上10点 / 每周五下午5点</div>
     <div class="panel-btns">
       <button id="reminder-ok" class="btn primary">设置</button>
       <button id="reminder-cancel" class="btn">取消</button>
     </div>
-  </div>
-
-  <!-- 方案B：提醒到点常显条（确认后才消失） -->
-  <div id="reminder-bar" class="hidden">
-    <span id="reminder-text"></span>
-    <button id="reminder-done" class="btn primary">知道了</button>
+    <label class="reminder-sound" for="reminder-sound">
+      <input id="reminder-sound" type="checkbox" checked />
+      <span>到点播放提示音</span>
+    </label>
   </div>
 
   <script type="module" src="./src/main.ts"></script>

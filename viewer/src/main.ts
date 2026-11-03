@@ -6,6 +6,18 @@ import * as PIXI from 'pixi.js'
 import { parseReminder } from './reminder'
 import { shouldPlay } from './state-priority'
 import { effectiveWeight } from './temperament' // V2-A: 气质调制器（2026-08-09）
+// Part A：陪伴交互（左键分区 / 人格气泡 / 提醒三件套）
+import { resolveHit, buildAlphaMap, toLayoutPoint } from './hit-test'
+import { pickBubble, type BubbleScene } from './persona-bubbles'
+import {
+  createQueue, enqueue, currentOf, pendingCount, dismiss,
+  type QueueState, type ReminderEntry
+} from './reminder-queue'
+import { applyFocusState, focusLabel } from './focus'
+import { playDing, unlockAudio } from './audio'
+// 音效资源走 Vite 资源管线：构建后自动落到 dist/assets/ 并返回可用 URL
+// （直接写 './assets/ding.wav' 在生产模式下会指向不存在的 dist/assets/ding.wav，play() 必失败）
+import dingUrl from '../assets/ding.wav?url'
 
 // ================= 类型 =================
 interface PetActionSpec {
@@ -30,6 +42,7 @@ interface PetJson {
   name: string
   theme?: string
   bubbles?: string[] // v3：互动气泡文案池（优先于内置 BUBBLE_TEXTS）
+  persona?: string // Part A：人格（温柔/傲娇/搞笑）——决定互动气泡语气；缺省回退 bubbles
   cellWidth: number
   cellHeight: number
   error?: string
@@ -64,8 +77,8 @@ declare global {
       notifyPetLoaded: (id: string) => void
       notifyAction: (info: { mood: string; text: string }) => void
       onAction: (cb: (name: string) => void) => void
-      setReminder: (spec: { at: number; repeat: string; text: string }) => Promise<{ id?: string; error?: string }>
-      onReminderFire: (cb: (r: { id: string; text: string }) => void) => void
+      setReminder: (spec: { at: number; repeat: string; text: string; kind?: string }) => Promise<{ id?: string; error?: string }>
+      onReminderFire: (cb: (r: { id: string; text: string; kind?: string; sound?: boolean }) => void) => void
       appendActivity: (entry: { petId: string; mood: string; text: string }) => void
       openDiary: (petId: string) => void
       onOpenReminder: (cb: () => void) => void
@@ -73,8 +86,39 @@ declare global {
       showContextMenu: (x: number, y: number) => Promise<void>
       listActivity: (petId: string) => Promise<{ ts: number; mood: string; text: string }[]>
       onPetSwitch: (cb: (id: string) => void) => void
+      // Part A：数值 / 偏好 / 专注钩子 / 音效上报
+      statsGet: (petId: string) => Promise<StatsResponse | null>
+      statsPatch: (petId: string, delta: StatsDelta) => Promise<StatsResponse | null>
+      prefsGet: () => Promise<{ sound: boolean } | null>
+      prefsSet: (patch: { sound?: boolean }) => Promise<{ ok: boolean; sound: boolean } | null>
+      reportAudio: (status: string, detail?: string) => void
+      onFocusChange: (cb: (entering: boolean) => void) => void
     }
   }
+}
+
+interface StatsState {
+  date: string
+  mood: number
+  satiety: number
+  checkins: number
+  moodToday: number
+  deviceId: string
+}
+
+interface StatsDelta {
+  feed?: true
+  checkin?: true
+  mood?: number
+}
+
+interface StatsResponse {
+  ok: boolean
+  error?: string
+  state?: StatsState
+  applied?: { mood: number; satiety: number; checkins: number }
+  capped?: { mood: boolean; satiety: boolean }
+  rejected?: string[]
 }
 
 // ================= 状态 =================
@@ -95,7 +139,17 @@ let pingpongDir = 1
 let bubbleTimer: ReturnType<typeof setTimeout> | null = null
 let randomTimer: ReturnType<typeof setInterval> | null = null
 let transitionTimer: ReturnType<typeof setTimeout> | null = null // 行为链调度（scheduleTransition）
-let reminderBarOn = false
+// Part A：陪伴交互状态
+let reminderQueue: QueueState = createQueue()
+let bigBubbleOn = false
+let bigBubbleTimer: ReturnType<typeof setTimeout> | null = null
+let soundEnabled = true
+let focusOn = false
+const alphaMaps: Record<string, Uint8ClampedArray> = {}
+let lastBubble = ''
+let noReactUntil = 0
+const BUBBLE_MS = 3000         // 普通气泡 3 秒（PRD：3 秒内消失）
+const BIG_COLLAPSE_MS = 10000  // 大气泡 10 秒后收成小胶囊，但不丢提醒
 // 渲染进程跟踪的窗口状态（初始 = 主进程创建尺寸/位置；本地维护，避免异步竞态漂移）
 let curWinW = 320
 let curWinH = 320
@@ -118,6 +172,7 @@ async function init() {
   app.canvas.style.width = '100%'
   app.canvas.style.height = '100%'
   app.canvas.style.display = 'block'
+  app.canvas.classList.add('pet-canvas') // 弹跳/抖动动效挂在这（见 style.css）
   // P2-3: 可访问性——canvas 角色标注（屏幕阅读器能读出这是桌宠）
   app.canvas.setAttribute('role', 'img')
   app.canvas.setAttribute('aria-label', pet?.name ? `${pet.name}（桌面宠物）` : '桌面宠物')
@@ -129,6 +184,7 @@ async function init() {
 
   app.canvas.addEventListener('pointerdown', async (e) => {
     dragging = true
+    unlockAudio(dingUrl) // 首次手势解锁音频（自动播放策略的双保险之一）
     startScreen = { x: e.screenX, y: e.screenY }
     winStart = await window.petAPI.getWindowPosition()
     app.canvas.setPointerCapture(e.pointerId)
@@ -155,7 +211,7 @@ async function init() {
     const out: { x: number; y: number; w: number; h: number }[] = []
     for (const el of [
       document.getElementById('reminder-panel'),
-      document.getElementById('reminder-bar')
+      document.getElementById('big-bubble') // 提醒气泡里有 [已完成] 按钮，必须可点
     ]) {
       if (el && !el.classList.contains('hidden')) {
         const r = el.getBoundingClientRect()
@@ -185,8 +241,8 @@ async function init() {
   // 初始穿透
   setTimeout(() => window.petAPI.setIgnoreMouse(true, true), 300)
 
-  // 单击 = 互动气泡（桌宠灵魂：点宠物有反应；2026-08-06 用户明确：单击不占用为功能入口）
-  // 功能入口：托盘爪印（红苕日记/提醒/换肤/动作）+ 右键菜单（触控板双指/辅助点按用户）
+  // 单击 = 互动：点头部摸头 / 点身体喂食 / 点透明区无反应（Part A）
+  // 功能入口：托盘 + 右键菜单（原生菜单，自动毛玻璃/定位）
   let downPos = { x: 0, y: 0 }
   let lastPointerUp = 0
   app.canvas.addEventListener('pointerdown', (e) => { downPos = { x: e.clientX, y: e.clientY } })
@@ -194,7 +250,7 @@ async function init() {
     lastPointerUp = Date.now()
     if (e.button !== 0) return // 只处理左键（右键走 contextmenu 菜单）
     const dist = Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y)
-    if (dist < 6) showBubbleText() // 单击 = 互动气泡
+    if (dist < 6) void handlePetClick(e.clientX, e.clientY)
   })
 
   // 右键 → 原生 macOS 菜单（主进程 Menu.popup，自动毛玻璃/定位）
@@ -345,6 +401,33 @@ async function loadAction(name: string) {
     }))
   }
   textures[name] = frames
+  // Part A：为命中判定预生成 64×64 alpha 缩略图（每动作一张，取首帧）
+  buildAlphaMapFor(name, frames[0])
+}
+
+/**
+ * 从动作首帧生成 alpha 缩略图，供"点透明区不响应"使用。
+ * 失败（纹理源不可绘制/跨源限制）则静默跳过，判定退化为只按区域。
+ */
+function buildAlphaMapFor(name: string, tex: PIXI.Texture | undefined) {
+  if (!tex || alphaMaps[name]) return
+  try {
+    const src = tex.source.resource as unknown as CanvasImageSource | undefined
+    if (!src) return
+    const size = 64
+    const canvas = document.createElement('canvas')
+    canvas.width = size
+    canvas.height = size
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })
+    if (!ctx) return
+    const f = tex.frame
+    ctx.clearRect(0, 0, size, size)
+    ctx.drawImage(src, f.x, f.y, f.width, f.height, 0, 0, size, size)
+    const rgba = ctx.getImageData(0, 0, size, size).data
+    alphaMaps[name] = buildAlphaMap(rgba, size, size, size)
+  } catch (e) {
+    console.warn(`[PetPet] alpha 缩略图生成失败（${name}），命中判定退化为区域判定`, e)
+  }
 }
 
 function updateTitle() {
@@ -454,10 +537,19 @@ function resetZoom() {
 }
 
 // ================= 气泡 =================
-function showBubbleText(text?: string) {
+/**
+ * 显示一条气泡。
+ * @param text  指定文案（省略则按 scene 从人格池里抽）
+ * @param scene 互动场景（head/feed/water/focusEnd）——用 persona 选池，缺省回退 bubbles
+ */
+function showBubbleText(text?: string, scene?: BubbleScene) {
   const bubble = document.getElementById('bubble')!
   const pool = bubblePool()
-  bubble.textContent = text || pool[Math.floor(Math.random() * pool.length)]
+  const picked = text
+    || (scene ? pickBubble(pet?.persona, scene, Math.random, lastBubble) : undefined)
+    || pool[Math.floor(Math.random() * pool.length)]
+  lastBubble = picked
+  bubble.textContent = picked
   bubble.classList.remove('hidden')
   bubble.style.left = '50%'
   bubble.style.top = '8px'
@@ -466,7 +558,7 @@ function showBubbleText(text?: string) {
   if (bubbleTimer) clearTimeout(bubbleTimer)
   bubbleTimer = setTimeout(() => {
     bubble.classList.add('hidden')
-  }, 6000)
+  }, BUBBLE_MS)
 }
 
 // ================= 红苕日记（方案B） =================
@@ -505,12 +597,110 @@ function logActionActivity(name: string) {
 }
 
 
+// ================= 左键分区：摸头 / 喂食（Part A） =================
+async function handlePetClick(x: number, y: number) {
+  if (!sprite || !pet) return
+  if (Date.now() < noReactUntil) return // 弹跳/抖动进行中忽略，避免误触与判定漂移
+  const b = sprite.getBounds()
+  // 指针是视口坐标，sprite.getBounds() 是布局坐标：动效（呼吸/平移）作用在 .pet-stage 上，
+  // 必须按 canvas 的实际缩放换回布局坐标，否则头/身边界会错几个像素
+  const el = app.canvas as HTMLCanvasElement
+  const rect = el.getBoundingClientRect()
+  const p = toLayoutPoint({
+    clientX: x, clientY: y,
+    rectLeft: rect.left, rectTop: rect.top, rectWidth: rect.width, rectHeight: rect.height,
+    layoutWidth: el.clientWidth || el.width || rect.width,
+    layoutHeight: el.clientHeight || el.height || rect.height
+  })
+  const region = resolveHit(
+    { x: b.x, y: b.y, width: b.width, height: b.height },
+    p.x, p.y,
+    alphaMaps[currentAction] || null
+  )
+  console.debug('[PetPet][命中]', JSON.stringify({
+    x: Math.round(p.x), y: Math.round(p.y),
+    bounds: { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.width), h: Math.round(b.height) },
+    hasAlpha: !!alphaMaps[currentAction], action: currentAction, region
+  }))
+  if (!region) return // 点到透明区：不响应（不冒泡、不加数值）
+  if (region === 'head') await interactHead()
+  else await interactFeed()
+}
+
+/** 摸头：弹跳 + 人格气泡 + 心情 +5（每日封顶 15，由主进程判定） */
+async function interactHead() {
+  bouncePet()
+  const r = await statsPatch({ mood: 5 })
+  const capped = !!r?.capped?.mood
+  showBubbleText(capped ? '今天摸够啦，明天再来～' : undefined, 'head')
+}
+
+/** 喂食：人格气泡 + 饱腹 +20（封顶 100） */
+async function interactFeed() {
+  const r = await statsPatch({ feed: true })
+  const capped = !!r?.capped?.satiety
+  showBubbleText(capped ? '已经吃得饱饱的啦' : undefined, 'feed')
+}
+
+function bouncePet() {
+  const c = app.canvas as HTMLCanvasElement
+  noReactUntil = Date.now() + 220
+  c.classList.remove('pp-bounce')
+  void c.offsetWidth // 强制重排，让同名动画能重播
+  c.classList.add('pp-bounce')
+  window.setTimeout(() => c.classList.remove('pp-bounce'), 220)
+}
+
+function shakePet() {
+  const c = app.canvas as HTMLCanvasElement
+  noReactUntil = Date.now() + 420
+  c.classList.remove('pp-shake')
+  void c.offsetWidth
+  c.classList.add('pp-shake')
+  window.setTimeout(() => c.classList.remove('pp-shake'), 420)
+}
+
+/** 数值更新：B 组未就绪时静默降级（不弹错、不打断互动） */
+async function statsPatch(delta: StatsDelta): Promise<StatsResponse | null> {
+  if (!petId) return null
+  try {
+    const api = window.petAPI
+    if (typeof api.statsPatch !== 'function') return null
+    const r = await api.statsPatch(petId, delta)
+    return r && r.ok ? r : null
+  } catch (e) {
+    console.warn('[PetPet] 数值更新失败（不影响互动）', e)
+    return null
+  }
+}
+
+async function refreshPrefs() {
+  try {
+    const p = await window.petAPI.prefsGet()
+    soundEnabled = !p || p.sound !== false
+  } catch {
+    soundEnabled = true
+  }
+  const cb = document.getElementById('reminder-sound') as HTMLInputElement | null
+  if (cb) cb.checked = soundEnabled
+}
+
+/** 专注钩子（B 组通过 focus:state 触发；当前无发送方时是空转） */
+function setFocusState(entering: boolean) {
+  focusOn = entering
+  const fx = applyFocusState(entering)
+  const stage = document.getElementById('petStage')
+  if (stage) stage.classList.toggle('is-focused', fx.resting)
+  if (app.canvas) app.canvas.setAttribute('aria-label', focusLabel(entering, petDisplayName()))
+}
+
 // ================= 提醒系统（方案B） =================
 function openReminderPanel() {
   document.getElementById('reminder-panel')!.classList.remove('hidden')
   const input = document.getElementById('reminder-input') as HTMLInputElement
   input.value = ''
   input.focus()
+  void refreshPrefs()
 }
 
 function closeReminderPanel() {
@@ -526,7 +716,7 @@ async function submitReminder() {
     showBubbleText('我听不懂这个时间…试试「一分钟后提醒我喝水」')
     return
   }
-  const res = await window.petAPI.setReminder({ at: spec.at, repeat: spec.repeat, text: spec.text })
+  const res = await window.petAPI.setReminder({ at: spec.at, repeat: spec.repeat, text: spec.text, kind: 'custom' })
   if (res && res.error) {
     showBubbleText('这个时间有点奇怪，换个说法试试？')
     return
@@ -541,22 +731,98 @@ async function submitReminder() {
   window.petAPI.appendActivity({ petId, mood: '答应', text: `${petDisplayName()}答应提醒你：${when} ${spec.text}${repeatLabel}` })
 }
 
-function handleReminderFire(r: { id: string; text: string }) {
-  reminderBarOn = true
-  const bar = document.getElementById('reminder-bar')!
-  // P1-4: 多条提醒同时到点不覆盖——已显示的提醒条追加新条目（换行），而非替换
-  const existing = document.getElementById('reminder-text')!.textContent
-  document.getElementById('reminder-text')!.textContent = existing && existing !== '⏰ '
-    ? existing + '\n⏰ ' + r.text
-    : '⏰ ' + r.text
-  bar.classList.remove('hidden')
+/** 快捷提醒：喂食 / 喂水（1 小时后，一次性） */
+async function submitQuickReminder(kind: 'feed' | 'water') {
+  const name = petDisplayName()
+  const at = Date.now() + 3600_000
+  const text = kind === 'feed' ? `该给${name}喂饭啦` : `该给${name}换水啦`
+  const res = await window.petAPI.setReminder({ at, repeat: 'none', text, kind })
+  if (res && res.error) {
+    showBubbleText('设置失败了，稍后再试')
+    return
+  }
+  closeReminderPanel()
+  const d = new Date(at)
+  const p = (n: number) => String(n).padStart(2, '0')
+  const when = `${p(d.getHours())}:${p(d.getMinutes())}`
+  showBubbleText(`好哦，${when} 提醒你${kind === 'feed' ? '喂饭' : '换水'}`)
+  window.petAPI.appendActivity({ petId, mood: '答应', text: `${name}答应提醒你：${when} ${text}` })
+}
+
+function normalizeKind(k?: string): ReminderEntry['kind'] {
+  return k === 'feed' || k === 'water' ? k : 'custom'
+}
+
+/**
+ * 提醒到点：入队 → 大气泡 + 抖动 + 音效（三件套）。
+ * 多条同时到点时排队，气泡上显示「还有 N 条」，不会丢提醒。
+ */
+function handleReminderFire(r: { id: string; text: string; kind?: string; sound?: boolean }) {
+  reminderQueue = enqueue(reminderQueue, { id: r.id, text: r.text, kind: normalizeKind(r.kind) })
+  renderBigBubble()
+  shakePet()
+  void playReminderSound(r.sound !== false)
   requestAction('wiggle', 'reminder') // 提醒时扭两下，不打扰地刷存在感（reminder 源优先，可打断当前动作）
 }
 
-function dismissReminder() {
-  reminderBarOn = false
-  document.getElementById('reminder-bar')!.classList.add('hidden')
-  window.petAPI.appendActivity({ petId, mood: '放心', text: `${petDisplayName()}确认你收到提醒了。` })
+async function playReminderSound(enabled: boolean = soundEnabled) {
+  if (!enabled) {
+    window.petAPI.reportAudio('skipped', '提示音已关闭')
+    return
+  }
+  const status = await playDing(dingUrl)
+  window.petAPI.reportAudio(status, status === 'played' ? 'ding.wav' : 'play() 被拒绝（自动播放策略）')
+}
+
+function renderBigBubble() {
+  const el = document.getElementById('big-bubble')!
+  const cur = currentOf(reminderQueue)
+  if (!cur) {
+    bigBubbleOn = false
+    el.classList.add('hidden')
+    el.classList.remove('bb-collapsed')
+    if (bigBubbleTimer) { clearTimeout(bigBubbleTimer); bigBubbleTimer = null }
+    return
+  }
+  bigBubbleOn = true
+  const icon = cur.kind === 'feed' ? '🍚' : cur.kind === 'water' ? '💧' : '⏰'
+  const iconEl = document.getElementById('big-bubble-icon')
+  const miniEl = document.getElementById('big-bubble-mini')
+  const textEl = document.getElementById('big-bubble-text')
+  const moreEl = document.getElementById('big-bubble-more')
+  if (iconEl) iconEl.textContent = icon
+  if (miniEl) miniEl.textContent = icon
+  if (textEl) textEl.textContent = cur.text
+  const n = pendingCount(reminderQueue)
+  if (moreEl) {
+    moreEl.textContent = n > 0 ? `还有 ${n} 条` : ''
+    moreEl.classList.toggle('hidden', n === 0)
+  }
+  el.classList.remove('hidden', 'bb-collapsed')
+  if (bigBubbleTimer) clearTimeout(bigBubbleTimer)
+  // 10 秒后收起成小胶囊：不打扰看宠物，但提醒不会丢（点一下可展开）
+  bigBubbleTimer = setTimeout(() => el.classList.add('bb-collapsed'), BIG_COLLAPSE_MS)
+}
+
+function expandBigBubble() {
+  const el = document.getElementById('big-bubble')
+  if (!el || el.classList.contains('hidden')) return
+  el.classList.remove('bb-collapsed')
+  if (bigBubbleTimer) clearTimeout(bigBubbleTimer)
+  bigBubbleTimer = setTimeout(() => el.classList.add('bb-collapsed'), BIG_COLLAPSE_MS)
+}
+
+/** [已完成]：打卡 + 出队；还有下一条则自动顶上 */
+async function completeCheckin() {
+  const cur = currentOf(reminderQueue)
+  if (!cur) return
+  reminderQueue = dismiss(reminderQueue)
+  const r = await statsPatch({ checkin: true })
+  const more = pendingCount(reminderQueue)
+  renderBigBubble()
+  if (more === 0) {
+    showBubbleText(r ? '吃饱啦，谢谢主人！' : '收到啦！', 'feed')
+  }
 }
 
 function openDiary() {
@@ -578,7 +844,6 @@ function setupUI() {
   })
   document.getElementById('reminder-ok')!.addEventListener('click', submitReminder)
   document.getElementById('reminder-cancel')!.addEventListener('click', closeReminderPanel)
-  document.getElementById('reminder-done')!.addEventListener('click', dismissReminder)
   window.petAPI.onReminderFire((r) => handleReminderFire(r))
   // 托盘兜底入口：提醒面板（右键手势不可用时）
   window.petAPI.onOpenReminder(() => openReminderPanel())
@@ -590,6 +855,32 @@ function setupUI() {
       app.ticker.stop()
     }
   })
+
+  // ---- Part A：提醒快捷入口 / 提示音开关 / 打卡按钮 ----
+  const quick = document.getElementById('reminder-quick')
+  quick?.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest('[data-kind]') as HTMLElement | null
+    const kind = btn?.dataset.kind
+    if (kind === 'feed' || kind === 'water') void submitQuickReminder(kind)
+  })
+
+  const soundBox = document.getElementById('reminder-sound') as HTMLInputElement | null
+  soundBox?.addEventListener('change', () => {
+    soundEnabled = !!soundBox.checked
+    void window.petAPI.prefsSet({ sound: soundEnabled })
+    showBubbleText(soundEnabled ? '好，到点会响一声～' : '好，到点只抖不响')
+  })
+
+  document.getElementById('big-bubble-done')?.addEventListener('click', (e) => {
+    e.stopPropagation() // 别让点击冒泡到"展开"处理
+    void completeCheckin()
+  })
+  // 收起成小胶囊后点一下可展开
+  document.getElementById('big-bubble')?.addEventListener('click', () => expandBigBubble())
+
+  // 专注钩子（B 组通过 focus:state 触发，本组只负责表现）
+  window.petAPI.onFocusChange((entering) => setFocusState(entering))
+  void refreshPrefs()
 }
 
 // ================= 随机行为 =================
@@ -606,7 +897,7 @@ function scheduleTransition(name: string) {
   const durMs = Math.min(12000, Math.max(2000, ((act.frames || 1) / (act.fps || 4)) * 1000))
   transitionTimer = setTimeout(() => {
     transitionTimer = null
-    if (!pet || currentAction !== name) return
+    if (!pet || focusOn || currentAction !== name) return
     const trans = act.transitions
     if (trans && Object.keys(trans).length > 0) {
       // 转移链：按权重选下一个动作（Shimeji NextBehaviorList 思路，docs/11 §2.1）
@@ -631,7 +922,7 @@ function startRandomBehavior() {
     if (!pet) return
     // 8/5：自动演示只在待机状态触发——用户手动切换动作后锁定，验证/观看不被随机切换打断
     // P3-4: 提醒横幅显示期间也暂停随机行为（提醒是用户关注的焦点，宠物别抢戏）
-    if (currentAction !== 'idle' || reminderBarOn) return
+    if (currentAction !== 'idle' || bigBubbleOn || focusOn) return
     const candidates = Object.entries(pet.actions).filter(([name, act]) => {
       return textures[name] && name !== currentAction && (act.weight ?? 0) > 0
     })
