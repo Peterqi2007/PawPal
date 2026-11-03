@@ -1361,6 +1361,26 @@ const openReminderArg = process.argv.includes('--open-reminder')
 // 演示/验证用：--open-refs 启动后自动打开参考图库（等效托盘菜单点击）
 const openRefsArg = process.argv.includes('--open-refs')
 
+// ==== SECTION: B / status-focus ====
+// B-1 数值系统：饱腹 / 心情 / 打卡。A 组的摸头、喝水、喂食统一走 stats:patch，
+// 避免两套状态打架；状态落 ~/.petpet/state/<petId>.json（契约 C2）。
+const { createStatsStore } = require('./stats-store.cjs')
+const statsStore = createStatsStore({
+  baseDir: path.join(app.getPath('home'), '.petpet')
+})
+
+// 宠物 id 由主进程决定，渲染进程传什么都要过 safePetId 白名单（防路径穿越）
+function statsPetId(petId) {
+  return safePetId(petId) || safePetId(currentPetId) || 'default'
+}
+
+ipcMain.handle('stats:get', (_e, petId) => statsStore.get(statsPetId(petId)))
+// 兼容两种调用：stats:patch(petId, delta) 与 A 组契约里的 stats:patch(delta)
+ipcMain.handle('stats:patch', (_e, a, b) => {
+  const deltaOnly = b === undefined && a && typeof a === 'object'
+  return statsStore.patch(statsPetId(deltaOnly ? null : a), deltaOnly ? a : b)
+})
+
 app.whenReady().then(() => {
   registerPetpetProtocol()  // N-3：自定义协议（CSP 已放行 petpet:）
   registerMediaProtocol()   // 动画素材协议（petmedia:）
