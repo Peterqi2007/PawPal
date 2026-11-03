@@ -16,6 +16,7 @@ const {
 } = require('./seedance-client.cjs')
 const { buildActionSpec, safeSlug, DEFAULT_CELL, DEFAULT_FRAMES, greenRatioOfBitmap } = require('./animator.cjs')
 const { assemblePet, collectSheets, safeId } = require('./pet-assembler.cjs')
+const companion = require('./companion.cjs') // Part A：数值/偏好/persona 回写
 
 const PETS_ROOT = path.join(app.getPath('home'), '.petpet', 'pets')
 
@@ -98,7 +99,9 @@ const refsStore = createRefsStore(REFS_ROOT, { thumbMaker: makeThumb })
 // N-3：注册自定义协议（需在 app ready 前），渲染层用短 URL 流式读资产
 // petpet://<petId>/<relPath> → 文件系统，零 base64、零主进程内存驻留
 protocol.registerSchemesAsPrivileged([
-  { scheme: 'petpet', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } },
+  // corsEnabled：渲染层要把精灵表画进 canvas 做 alpha 命中判定（drawImage + getImageData），
+  // 不开 CORS 的话画布会被标记为跨源污点，getImageData 直接抛 SecurityError（命中判定失效）
+  { scheme: 'petpet', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: true } },
   // 动画素材（本地视频/精灵表）专用：隐藏窗口用它把 mp4 喂给 <video> 抽帧，
   // corsEnabled 让 canvas 不被标记为「跨源污点」，从而能 toDataURL 导出精灵表
   { scheme: 'petmedia', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: true } }
@@ -143,6 +146,17 @@ function saveUiState(patch) {
   }
 }
 
+// ==== SECTION: A / companion-pet ====
+// Part A：数值（stats:get/patch）、偏好（prefs:get/set）、音效日志（audio:report）
+// 契约见 docs/handoff/README.md §5 C2/C3；数据落在 ~/.petpet/state/<petId>.json
+const petCompanion = companion.registerPetCompanion({
+  ipcMain,
+  app,
+  readUiState: loadUiState,
+  writeUiState: saveUiState
+})
+// ==== SECTION: A / end ====
+
 function createWindow() {
   const { width, height } = screen.getPrimaryDisplay().workAreaSize
   const saved = loadUiState()
@@ -163,7 +177,9 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,  // D-4: 加固（preload 仅用 contextBridge/ipcRenderer，sandbox 下兼容）
-      backgroundThrottling: false // 动画不节流（借鉴 bitnp）
+      backgroundThrottling: false, // 动画不节流（借鉴 bitnp）
+      // Part A：提醒音效是本地 wav，无需用户手势即可播放（首次指针手势仍会解锁一次，双保险）
+      autoplayPolicy: 'no-user-gesture-required'
     }
   })
 
@@ -257,6 +273,7 @@ function rebuildTrayMenu() {
   template.push({ type: 'separator' })
   template.push({ label: '📦 导入宠物包', click: () => handleImportPet() })
   template.push({ label: '🖼 参考图库', click: () => openRefsWindow() })
+  template.push({ label: '✏️ 编辑档案', click: () => openRefsWindow() })
 
   // 方案B：功能入口兜底（右键手势不可用时从托盘调出）
   template.push({ type: 'separator' })
@@ -309,6 +326,7 @@ ipcMain.handle('menu:showContext', (_evt, x, y) => {
     { label: '⏰ 提醒我', click: () => openReminderWithFocus() },
     { label: `📖 ${petName}日记`, click: () => openDiaryWindow(currentPetId || '') },
     { label: '🖼 参考图库', click: () => openRefsWindow() },
+    { label: '✏️ 编辑档案', click: () => openRefsWindow() }, // Part A：复用图库窗（改名字/照片/人格）
     { type: 'separator' }
   ]
   if (currentPetActions && Object.keys(currentPetActions).length > 0) {
@@ -477,7 +495,11 @@ function registerPetpetProtocol() {
       const full = path.join(PETS_ROOT, petId, relPath)
       // D-2/D-6: 路径边界检查 + realpath 纵深
       if (!isSafeUnderRoot(full, PETS_ROOT)) return new Response(null, { status: 403 })
-      return net.fetch(pathToFileURL(full).toString())
+      const res = await net.fetch(pathToFileURL(full).toString())
+      // 配合上面的 corsEnabled：允许渲染层以 CORS 方式读取并画进 canvas（本地文件、已做路径边界校验）
+      const headers = new Headers(res.headers)
+      headers.set('Access-Control-Allow-Origin', '*')
+      return new Response(res.body, { status: res.status, headers })
     } catch (e) {
       return new Response(null, { status: 404 })
     }
@@ -520,7 +542,8 @@ function loadReminders() {
     const raw = JSON.parse(fs.readFileSync(REMINDERS_FILE, 'utf-8'))
     for (const [id, r] of Object.entries(raw.reminders || {})) {
       if (!r || typeof r.at !== 'number' || !r.text) continue
-      reminders.set(id, { at: r.at, repeat: r.repeat || 'none', text: r.text })
+      const kind = r.kind === 'feed' || r.kind === 'water' ? r.kind : 'custom'
+      reminders.set(id, { at: r.at, repeat: r.repeat || 'none', text: r.text, kind })
       reminderSeq = Math.max(reminderSeq, parseInt(String(id).replace(/\D/g, '')) || 0)
     }
     console.log(`[PetPet] 已载入 ${reminders.size} 条提醒`)
@@ -1225,6 +1248,17 @@ ipcMain.handle('pet:assemble', (_evt, groupId) => {
   })
   if (!built.ok) return { ok: false, error: built.error }
 
+  // Part A：把图库档案里的"人格"写进 pet.json.persona（只读 profile、只写 pet.json，不碰图库文件）
+  try {
+    const persona = group && group.profile ? group.profile.temperament : ''
+    if (persona) {
+      const r = companion.attachPersona(built.dir, persona)
+      if (!r.ok) console.warn('[PetPet][装配] persona 回写失败:', r.error)
+    }
+  } catch (e) {
+    console.error('[PetPet][装配] persona 回写异常:', e)
+  }
+
   // 装好立即切换，用户能马上在桌面上看到
   rebuildTrayMenu()
   send('pet:switch', built.id)
@@ -1304,8 +1338,10 @@ ipcMain.handle('reminder:set', (_evt, spec) => {
   }
   const repeat = ['none', 'daily', 'weekly'].includes(spec.repeat) ? spec.repeat : 'none'
   const text = String(spec.text || '该办正事啦！').slice(0, 200) // AI 工具审计：限制长度防存储膨胀/UI 溢出
+  // Part A：提醒类型（喂食/喂水/自定义）——只影响气泡图标与文案口吻，属于展示元数据
+  const kind = spec.kind === 'feed' || spec.kind === 'water' ? spec.kind : 'custom'
   const id = 'r' + (++reminderSeq)
-  reminders.set(id, { at: spec.at, repeat, text })
+  reminders.set(id, { at: spec.at, repeat, text, kind })
   saveReminders()  // P0-5: 持久化
   console.log(`[PetPet] 提醒已设置 #${id} → ${new Date(spec.at).toLocaleString()} [${repeat}] ${reminders.get(id).text}`)
   return { id }
@@ -1313,7 +1349,7 @@ ipcMain.handle('reminder:set', (_evt, spec) => {
 
 // P0-5: 提醒列表（查看/删除入口）
 ipcMain.handle('reminder:list', () => {
-  return [...reminders.entries()].map(([id, r]) => ({ id, at: r.at, repeat: r.repeat, text: r.text }))
+  return [...reminders.entries()].map(([id, r]) => ({ id, at: r.at, repeat: r.repeat, text: r.text, kind: r.kind || 'custom' }))
 })
 
 ipcMain.handle('reminder:del', (_evt, id) => {
@@ -1325,6 +1361,8 @@ ipcMain.handle('reminder:del', (_evt, id) => {
 function fireReminder(id) {
   const r = reminders.get(id)
   if (!r) return
+  // 渲染层还没就绪（刚启动/正在加载）→ 等下一次 tick，别把提醒发进虚空
+  if (!mainWindow || mainWindow.isDestroyed() || mainWindow.webContents.isLoading()) return
   console.log('[PetPet] 提醒触发 #' + id + ' → ' + r.text)
   // P1-3: 窗口隐藏时横幅不可见 → 发系统通知兜底；窗口可见仍走横幅
   if (mainWindow && !mainWindow.isVisible()) {
@@ -1332,7 +1370,7 @@ function fireReminder(id) {
       new Notification({ title: '⏰ 提醒', body: r.text }).show()
     } catch (e) { /* 无通知权限时忽略 */ }
   }
-  send('reminder:fire', { id, text: r.text })
+  send('reminder:fire', { id, text: r.text, kind: r.kind || 'custom', sound: petCompanion.soundEnabled() })
   appendActivity(currentPetId || '', { mood: '提醒', text: `${currentPetName || '宠物'}提醒你：` + r.text })
   if (r.repeat === 'daily') {
     r.at += 24 * 3600 * 1000
@@ -1362,6 +1400,7 @@ const openReminderArg = process.argv.includes('--open-reminder')
 const openRefsArg = process.argv.includes('--open-refs')
 
 app.whenReady().then(() => {
+  loadReminders()           // P0-5：启动即载入持久化提醒（此前只定义了函数、从未调用 → 重启丢提醒）
   registerPetpetProtocol()  // N-3：自定义协议（CSP 已放行 petpet:）
   registerMediaProtocol()   // 动画素材协议（petmedia:）
   createWindow()

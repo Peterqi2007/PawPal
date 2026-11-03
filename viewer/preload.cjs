@@ -17,6 +17,13 @@ contextBridge.exposeInMainWorld('petAPI', {
   onTestAction: (cb) => ipcRenderer.on('test:action', (_e, name) => cb(name)),
   setReminder: (spec) => ipcRenderer.invoke('reminder:set', spec),
   onReminderFire: (cb) => ipcRenderer.on('reminder:fire', (_e, r) => cb(r)),
+  // Part A：数值 / 偏好 / 专注钩子 / 音效上报
+  statsGet: (petId) => ipcRenderer.invoke('stats:get', petId),
+  statsPatch: (petId, delta) => ipcRenderer.invoke('stats:patch', petId, delta),
+  prefsGet: () => ipcRenderer.invoke('prefs:get'),
+  prefsSet: (patch) => ipcRenderer.invoke('prefs:set', patch),
+  reportAudio: (status, detail) => ipcRenderer.send('audio:report', status, detail),
+  onFocusChange: (cb) => ipcRenderer.on('focus:state', (_e, entering) => cb(!!entering)),
   appendActivity: (entry) => ipcRenderer.send('pet:activity', entry),
   listActivity: (petId) => ipcRenderer.invoke('pet:activity:list', petId),
   showContextMenu: (x, y) => ipcRenderer.invoke('menu:showContext', x, y),
