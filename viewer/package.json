@@ -1,0 +1,93 @@
+{
+  "name": "petpet-viewer",
+  "version": "1.3.0",
+  "description": "PetPet 桌面宠物查看器（Electron + PixiJS v8）",
+  "main": "main.js",
+  "author": "QClaw",
+  "license": "MIT",
+  "scripts": {
+    "dev": "concurrently -k \"vite\" \"wait-on tcp:127.0.0.1:5173 && cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron .\"",
+    "build": "tsc --noEmit && vite build",
+    "start": "npm run build && electron .",
+    "dist": "npm run build && electron-builder",
+    "test": "vitest run",
+    "test:boundary": "electron scripts/boundary-test.cjs",
+    "test:mem": "electron scripts/memtest.cjs"
+  },
+  "dependencies": {
+    "pixi.js": "^8.6.6"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "cross-env": "^7.0.3",
+    "electron": "^43.3.0",
+    "electron-builder": "^26.15.3",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.7",
+    "vitest": "^4.1.10",
+    "wait-on": "^8.0.1"
+  },
+  "productName": "PetPet",
+  "build": {
+    "appId": "com.petpet.desktop",
+    "productName": "PetPet",
+    "files": [
+      "main.js",
+      "security-utils.cjs",
+      "pet-import.cjs",
+      "refs-store.cjs",
+      "ark-config.cjs",
+      "seedream-client.cjs",
+      "seedance-client.cjs",
+      "animator.cjs",
+      "animator.html",
+      "animator-page.js",
+      "pet-assembler.cjs",
+      "preload.cjs",
+      "panel-preload.cjs",
+      "panel.html",
+      "panel.js",
+      "panel.css",
+      "refs-preload.cjs",
+      "refs.html",
+      "refs.css",
+      "refs.js",
+      "package.json",
+      "dist/**/*",
+      "index.html",
+      "!node_modules/**/*"
+    ],
+    "directories": {
+      "buildResources": "assets",
+      "output": "release"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "PetPet"
+    },
+    "mac": {
+      "icon": "icon_apple_dog.png",
+      "category": "public.app-category.entertainment"
+    },
+    "publish": null
+  }
+}

@@ -1,0 +1,9 @@
+.DS_Store
+__pycache__/
+*.pyc
+node_modules/
+dist/
+release/
+.venv/
+.pytest_cache/
+.idea/

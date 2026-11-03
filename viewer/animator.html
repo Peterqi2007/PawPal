@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; connect-src 'self' petmedia:; media-src 'self' petmedia: blob:; img-src 'self' data: blob:; style-src 'unsafe-inline'; script-src 'self'" />
+  <title>animator</title>
+</head>
+<body>
+  <!-- 隐藏窗口：只做「视频 → 抽帧 → 抠图 → 拼表」的像素活，不显示给用户 -->
+  <video id="v" muted playsinline preload="auto" crossOrigin="anonymous"></video>
+  <script src="./animator.cjs"></script>
+  <script src="./animator-page.js"></script>
+</body>
+</html>

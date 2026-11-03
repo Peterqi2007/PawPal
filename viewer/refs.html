@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'" />
+  <title>参考图库</title>
+  <link rel="stylesheet" href="./refs.css" />
+</head>
+<body>
+  <header class="bar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor" aria-hidden="true">
+          <ellipse cx="6.8" cy="7.6" rx="2.1" ry="2.9" />
+          <ellipse cx="12" cy="5.5" rx="2.1" ry="3.1" />
+          <ellipse cx="17.2" cy="7.6" rx="2.1" ry="2.9" />
+          <path d="M12 10.4c2.7 0 5.4 2 5.4 4.5 0 2.2-2 3.6-4.4 3.6h-2c-2.4 0-4.4-1.4-4.4-3.6 0-2.5 2.7-4.5 5.4-4.5z" />
+        </svg>
+      </span>
+      <span class="brand-name">参考图库</span>
+    </div>
+    <div class="bar-right">
+      <span class="pill">本地库 · 重绘时上传火山引擎</span>
+      <button id="close" class="close" title="关闭" aria-label="关闭参考图库">✕</button>
+    </div>
+  </header>
+
+  <main class="card">
+    <section class="hero">
+      <span class="tag">设定图 + 姿势参考 · 重绘锚点</span>
+      <h1>把你的宠物，<em>交给 AI 认清</em></h1>
+      <p class="sub">
+        每只宠物一个分组。组内第一张照片自动作为<b>设定图</b>——它锁住这只宠物的形象；
+        之后的照片作为<b>姿势参考图</b>——只借姿态，不借毛色。
+      </p>
+    </section>
+
+    <!-- 分组：一只宠物一组；首张导入时若没有分组会自动建一个 -->
+    <section class="groups">
+      <span class="groups-label">分组</span>
+      <div class="group-chips" id="groupChips" role="tablist" aria-label="宠物分组"></div>
+      <button class="group-add" id="groupAdd" title="为另一只宠物新建一个分组">+ 新建分组</button>
+    </section>
+
+    <form class="group-new hidden" id="groupNew">
+      <input id="groupName" type="text" maxlength="20" autocomplete="off" spellcheck="false"
+             placeholder="给这个分组起个名字，比如：豆豆" aria-label="新分组名称" />
+      <button type="submit" class="g-ok">创建</button>
+      <button type="button" class="g-cancel" id="groupCancel">取消</button>
+    </form>
+
+    <section class="drop" id="drop" role="button" tabindex="0"
+             aria-label="上传宠物照片：点击加号选择文件，或把图片拖到这里">
+      <span class="plus" aria-hidden="true">+</span>
+      <div class="drop-title">上传宠物照片</div>
+      <div class="drop-target" id="dropTarget">导入到「—」</div>
+      <div class="drop-sub">拖拽到此处，或点击 <b>+</b> 选择 · JPG / PNG / WebP / BMP · 单张最大 10MB</div>
+    </section>
+
+    <!-- 宠物档案：名字 / 类型 / 品种 / 人格。跟着分组走，装配时决定 pet.json 的名字与气泡 -->
+    <section class="profile" id="profile">
+      <div class="pf-head">
+        <span class="pf-title">宠物档案</span>
+        <span class="pf-tip">决定桌宠名字与说话风格</span>
+      </div>
+      <div class="pf-grid">
+        <label class="pf-field">
+          <span>宠物名字</span>
+          <input id="pfName" type="text" maxlength="20" placeholder="例如 豆豆" autocomplete="off" />
+        </label>
+        <div class="pf-field">
+          <span>宠物类型</span>
+          <div class="pf-chips" id="pfType" role="radiogroup" aria-label="宠物类型">
+            <button type="button" data-v="猫">猫</button>
+            <button type="button" data-v="狗">狗</button>
+            <button type="button" data-v="其他">其他</button>
+          </div>
+        </div>
+        <label class="pf-field">
+          <span>品种 <em>选填</em></span>
+          <input id="pfBreed" type="text" maxlength="20" placeholder="例如：橘猫、柯基…" autocomplete="off" />
+        </label>
+        <div class="pf-field pf-field-wide">
+          <span>人格 <em>决定气泡语气</em></span>
+          <div class="pf-cards" id="pfTemper" role="radiogroup" aria-label="人格">
+            <button type="button" data-v="温柔"><b>温柔</b><small>会撒娇</small></button>
+            <button type="button" data-v="傲娇"><b>傲娇</b><small>嘴硬心软</small></button>
+            <button type="button" data-v="搞笑"><b>搞笑</b><small>爱讲冷笑话</small></button>
+          </div>
+        </div>
+      </div>
+      <div class="pf-actions">
+        <button type="button" class="pf-save" id="pfSave">保存档案</button>
+        <button type="button" class="pf-preset" id="pfPreset" title="用项目自带的示例宠物作为形象">✨ 使用预设形象</button>
+        <span class="pf-state" id="pfState" role="status" aria-live="polite"></span>
+      </div>
+    </section>
+
+    <div class="gallery-head">
+      <span class="gh-left">已导入 <b id="count">0</b> 张<span class="dot">·</span><span id="summary">设定图 0 · 姿势参考 0</span></span>
+      <span class="ready" id="ready" aria-live="polite"></span>
+      <span class="hint" id="hint" role="status" aria-live="polite"></span>
+      <select id="animAction" class="anim-action" title="要生成的动作" aria-label="要生成的动作">
+        <option value="idle">待机</option>
+        <option value="sleep">睡觉</option>
+        <option value="wiggle">撒娇</option>
+        <option value="run">奔跑</option>
+        <option value="stretch">伸懒腰</option>
+        <option value="belly">露肚躺</option>
+      </select>
+      <button class="btn-anim" id="animBtn" type="button">🎬 生成动画</button>
+      <button class="btn-redraw" id="redraw" type="button">🎨 重绘设定图</button>
+      <button class="btn-gear" id="gear" type="button" title="生成设置" aria-label="生成设置" aria-expanded="false">⚙</button>
+    </div>
+
+    <!-- 桌宠：把当前分组装配成可运行宠物包，并在已装配的桌宠之间切换 -->
+    <section class="pet-bar">
+      <span class="pet-label">桌宠</span>
+      <select id="petSelect" aria-label="选择要切换的桌宠"></select>
+      <button id="petSwitch" type="button" class="pet-btn">切换</button>
+      <button id="petAssemble" type="button" class="pet-btn primary">🐾 装配当前分组</button>
+      <button id="petReextract" type="button" class="pet-btn" title="用已下载的视频重新抽帧，不消耗额度">↻ 重抽帧</button>
+      <span class="pet-now" id="petNow" role="status" aria-live="polite"></span>
+    </section>
+
+    <!-- 动画预览：精灵表按帧数做 background-position 步进，纯 CSS 播放 -->
+    <div class="anim-preview hidden" id="animPreview">
+      <div class="anim-strip" id="animStrip" role="img" aria-label="生成的动画预览"></div>
+      <div class="anim-info">
+        <div class="anim-title" id="animTitle">动画已生成</div>
+        <div class="anim-path" id="animPath"></div>
+      </div>
+    </div>
+
+    <!-- 生成设置：密钥只发往主进程落盘（~/.petpet/ark.json，0600），永不回显明文 -->
+    <form class="ark-panel hidden" id="arkPanel">
+      <div class="ark-row">
+        <label for="arkKey">API Key</label>
+        <input id="arkKey" type="password" autocomplete="off" spellcheck="false"
+               placeholder="ark-…（仅保存在本机，不回显）" />
+        <span class="ark-state" id="arkState">未配置</span>
+      </div>
+      <div class="ark-row">
+        <label for="arkBase">端点</label>
+        <select id="arkBase">
+          <option value="standard">标准 v3（/api/v3）</option>
+          <option value="plan">Plan / Coding Plan（/api/plan/v3）</option>
+        </select>
+        <label for="arkModel">图片模型</label>
+        <input id="arkModel" class="ark-model-input" type="text" autocomplete="off" spellcheck="false" list="arkModelPresets"
+               placeholder="doubao-seedream-…" />
+        <label for="arkVideoModel">视频模型</label>
+        <input id="arkVideoModel" class="ark-model-input" type="text" autocomplete="off" spellcheck="false" list="arkModelPresets"
+               placeholder="doubao-seedance-…" />
+        <button type="submit" class="ark-save">保存</button>
+      </div>
+      <datalist id="arkModelPresets">
+        <option value="doubao-seedream-5-0-pro-260628"></option>
+        <option value="doubao-seedream-5-0-flash-260915"></option>
+        <option value="doubao-seedance-2-0-260128"></option>
+        <option value="doubao-seedance-2-5-260628"></option>
+      </datalist>
+      <div class="ark-row">
+        <label for="arkStyle">风格</label>
+        <select id="arkStyle">
+          <option value="皮克斯3D卡通风格">皮克斯 3D</option>
+          <option value="写实风格">写实</option>
+          <option value="2D动漫风格">2D 动漫</option>
+        </select>
+        <span class="ark-state" id="arkModelHint">模型 ID 请从控制台「模型列表 / 推理接入点」复制</span>
+      </div>
+      <p class="ark-note">
+        点「重绘」会把当前分组的<b>设定图</b>与最多 <b>3 张姿势参考图</b>发送到火山引擎，生成一张新图并入本组。
+        需要：设定图 1 张 + 姿势参考图 ≥ 3 张。
+      </p>
+    </form>
+
+    <section class="gallery" id="gallery" aria-label="当前分组已导入的参考图"></section>
+  </main>
+
+  <footer class="foot">
+    <span class="safe">
+      <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.9"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 3.2 19 5.8v5.6c0 4.2-2.9 7.6-7 9.4-4.1-1.8-7-5.2-7-9.4V5.8z" />
+        <path d="m9.2 11.8 2 2 3.6-3.8" />
+      </svg>
+      照片本地保存 · 仅在点击重绘时上传
+    </span>
+    <span id="usage">占用 —</span>
+  </footer>
+
+  <script src="./refs.js"></script>
+</body>
+</html>
