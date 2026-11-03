@@ -1000,6 +1000,20 @@ function animNotify(payload) {
   if (refsWindow && !refsWindow.isDestroyed()) refsWindow.webContents.send('anim:progress', payload)
 }
 
+/**
+ * 任务记录落盘（anim/<slug>/<action>-task.json）。
+ * 为什么需要：轮询有 10 分钟上限（用户等不起更久），超时后若只把错误丢回面板，
+ * taskId 就跟着丢了——云端任务可能仍在生成且已计费，事后再想核对/补下载就没有线索。
+ * 这里只记 id/模型/状态，不落任何签名 URL。
+ */
+function writeAnimTask(dir, action, record) {
+  try {
+    fs.writeFileSync(path.join(dir, `${action}-task.json`), JSON.stringify(record, null, 2), 'utf-8')
+  } catch (e) {
+    console.error('[PetPet][动画] 任务记录写入失败:', e && e.message)
+  }
+}
+
 // 从已下载的 mp4 重新生成精灵表（云端任务已付费时，本地重抽不花钱）
 ipcMain.handle('anim:reextract', async (_evt, dirOrNull, action) => {
   try {
@@ -1097,21 +1111,54 @@ ipcMain.handle('anim:generate', async (_evt, groupId, opts) => {
       duration: Number(options.duration) || 5
     })
     const created = await seedance.createTask({ cfg, body })
-    if (!created.ok) return fail(created.error)
+    if (!created.ok) {
+      console.error('[PetPet][动画] 建任务失败:', created.error)
+      return fail(created.error)
+    }
+    const taskStartedAt = Date.now()
+    const taskBase = {
+      action,
+      taskId: created.taskId,
+      model: cfg.videoModel,
+      firstFrame: sourceImage.originalName,
+      createdAt: taskStartedAt
+    }
+    console.log(`[PetPet][动画] 任务已创建: ${created.taskId}（模型 ${cfg.videoModel}）`)
+    writeAnimTask(dir, action, { ...taskBase, status: 'running' })
 
-    // 3. 轮询
+    // 3. 轮询（10 分钟上限）
     const polled = await seedance.poll({
       cfg,
       taskId: created.taskId,
       signal: animAbort.signal,
       onProgress: (p) => animNotify({ stage: 'poll', status: p.status, elapsedMs: p.elapsedMs })
     })
-    if (!polled.ok) return fail(polled.error)
+    if (!polled.ok) {
+      console.error(`[PetPet][动画] 任务未完成（taskId ${created.taskId}）: ${polled.error}`)
+      writeAnimTask(dir, action, {
+        ...taskBase,
+        status: 'timeout',
+        error: polled.error,
+        updatedAt: Date.now()
+      })
+      return fail(polled.error)
+    }
+    console.log(`[PetPet][动画] 任务完成: ${created.taskId} 用时 ${Math.round((Date.now() - taskStartedAt) / 1000)}s`)
+    writeAnimTask(dir, action, {
+      ...taskBase,
+      status: 'succeeded',
+      elapsedMs: Date.now() - taskStartedAt,
+      updatedAt: Date.now()
+    })
 
     // 4. 下载视频
     animNotify({ stage: 'download' })
     const dl = await seedance.download({ url: polled.videoUrl })
-    if (!dl.ok) return fail(dl.error)
+    if (!dl.ok) {
+      console.error('[PetPet][动画] 视频下载失败:', dl.error)
+      writeAnimTask(dir, action, { ...taskBase, status: 'download-failed', error: dl.error, updatedAt: Date.now() })
+      return fail(dl.error)
+    }
     const videoFile = `${action}-source.mp4`
     const videoAbs = path.join(dir, videoFile)
     fs.writeFileSync(videoAbs, dl.buffer)
@@ -1133,6 +1180,7 @@ ipcMain.handle('anim:generate', async (_evt, groupId, opts) => {
     })
     if (!res || !res.ok) {
       console.error('[PetPet][动画] 精灵表生成失败:', res && res.error)
+      writeAnimTask(dir, action, { ...taskBase, status: 'extract-failed', error: res && res.error, updatedAt: Date.now() })
       return fail((res && res.error) || '精灵表生成失败')
     }
 

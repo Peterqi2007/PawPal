@@ -22,7 +22,9 @@ const DEFAULTS = {
   baseUrl: BASE_STANDARD,
   // 火山方舟的模型 ID 带日期后缀（2026-11 用 GET /api/v3/models 实测可用值）
   model: 'doubao-seedream-5-0-pro-260628',
-  videoModel: 'doubao-seedance-2-0-260128',
+  // 视频：默认用 fast 变体（同 2.0 家族的快速档，排队/生成耗时明显短于标准版；
+  // 需要画质可切 doubao-seedance-2-5-260628，需要更省可切 2-0-mini-260615）
+  videoModel: 'doubao-seedance-2-0-fast-260128',
   style: '皮克斯3D卡通风格'
 }
 

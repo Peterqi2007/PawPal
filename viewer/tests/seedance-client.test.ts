@@ -148,6 +148,7 @@ describe('客户端编排', () => {
     const r = await client.poll({ cfg: CFG, taskId: 't1', intervalMs: 0, timeoutMs: 2500 })
     expect(r.ok).toBe(false)
     expect(r.error).toContain('超时')
+    expect(r.error).toContain('t1') // 超时必须带上 taskId，否则事后无从追查（真实踩过：任务仍在云端跑却丢了 id）
   })
 
   it('下载视频字节', async () => {

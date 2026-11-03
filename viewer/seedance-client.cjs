@@ -175,7 +175,7 @@ function createSeedanceClient({ fetchImpl, now } = {}) {
       last = st
       await sleep(intervalMs, signal)
     }
-    return { ok: false, error: '任务超时未完成（可在控制台查看任务状态）' }
+    return { ok: false, error: `任务超时未完成（taskId: ${taskId}，已超过 ${Math.round(timeoutMs / 60000)} 分钟；该任务可能仍在云端生成，可在火山控制台按此 id 查看）` }
   }
 
   /** 下载视频字节（走同一套 fetch，便于统计与超时控制） */

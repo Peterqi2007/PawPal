@@ -29,6 +29,12 @@ afterEach(() => {
   fs.rmSync(dir, { recursive: true, force: true })
 })
 
+describe('默认视频模型', () => {
+  it('videoModel 默认用 fast 档（等待时间优先）', () => {
+    expect(DEFAULTS.videoModel).toBe('doubao-seedance-2-0-fast-260128')
+  })
+})
+
 describe('配置优先级与落盘', () => {
   it('无文件、无环境变量时返回默认值', () => {
     const cfg = loadConfig(file, {})
