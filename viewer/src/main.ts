@@ -517,6 +517,8 @@ async function applyScale() {
 
   // 缩放交给主进程：它知道窗口的真实 bounds，按中心缩放后夹回工作区并回传结果。
   // 渲染层不再自己算位置——之前正是"渲染层假设的尺寸"和"实际窗口"不一致，把窗口推到了屏幕外。
+  // 尺寸没变就别发 IPC：切换动作会频繁调用本函数，每次都让主进程 setBounds 是白噪声（日志也会刷屏）。
+  if (newW === curWinW && newH === curWinH) return
   const applied = await window.petAPI.scaleTo(newW, newH)
   if (applied) {
     curWinX = applied.x
