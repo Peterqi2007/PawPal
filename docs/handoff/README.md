@@ -106,7 +106,7 @@ python pipeline/validate_pet.py examples/dev-pet
 | 路径 | A | B | 说明 |
 |---|:---:|:---:|---|
 | `viewer/index.html` / `src/main.ts` / `src/style.css` / `preload.cjs` | ✍️ 独占 | — | 桌宠主窗全部归 A |
-| `viewer/capsule.*` / `capsule-preload.cjs` / `focus.html` / `focus.*` | — | ✍️ 独占 | 新窗口，B 新建 |
+| `viewer/capsule.*` / `capsule-preload.cjs` / `focus.html` / `focus.*` / `status-focus.cjs` / `focus-session.cjs` / `capsule-state.cjs` | — | ✍️ 独占 | 新窗口与专注逻辑，B 新建 |
 | `viewer/companion.cjs` / `stats-store.cjs` | — | ✍️ 独占 | 主进程模块 |
 | `viewer/assets/*.wav` | ✍️ 独占 | — | 提醒音效 |
 | `viewer/refs.*` / `refs-store.cjs` / `refs-preload.cjs` / `pet-assembler.cjs` / `animator*` | 🚫 **禁改** | 🚫 **禁改** | 图库 + AI 链路：本轮冻结 |
@@ -123,9 +123,12 @@ registerPetCompanion({ ipcMain, app, screen, send, PETS_ROOT })
 // ==== SECTION: A / end ====
 
 // ==== SECTION: B / status-focus ====
-registerStatusFocus({ ipcMain, app, screen, send, PETS_ROOT })
+registerStatusFocus({ app, screen, BrowserWindow, ipcMain, getPet, getStats, notifyPet, onStateChange })
 // ==== SECTION: B / end ====
 ```
+
+> 合并后实际签名（B 落地时按真实依赖注入，比 initial 设想多了 `getPet` / `getStats` / `notifyPet`；
+> `notifyPet` 就是 A 的 `send(channel, payload)` 闭包）。
 
 > 冲突时：**双方都保留，rebase 后手改**，不要删对方那行。
 
@@ -158,8 +161,8 @@ registerStatusFocus({ ipcMain, app, screen, send, PETS_ROOT })
 | 前缀 | 归属 | 用途 |
 |---|---|---|
 | `stats:*` | B 提供、A 消费 | `stats:get` / `stats:patch` |
-| `focus:*` | 双向 | A → B：`focus:request`（右键菜单点专注）；B → A：`focus:enter` / `focus:exit` / `focus:state` |
-| `capsule:*` | B | `capsule:expand` / `capsule:collapse` / `capsule:refresh` |
+| `focus:*` | 双向 | A → B：`focus:request`（右键/托盘点专注，A 已接）；B → A：**`focus:state`(entering:boolean)**（落定时统一用这条，`focus:enter/exit` 未使用） |
+| `capsule:*` | B | `capsule:get` / `capsule:refresh`（主进程→胶囊广播）/ `capsule:toggle` / `capsule:setIgnoreMouse`；`capsule:expand/collapse` 由胶囊自己用 CSS 完成，未走 IPC |
 | `reminder:*` | A | 现有 3 个通道**扩字段不删旧字段** |
 | `pet:*` | 现有 | A 扩展 `pet:assemble` 写 `persona`（只加字段） |
 

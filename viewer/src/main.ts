@@ -93,6 +93,7 @@ declare global {
       prefsSet: (patch: { sound?: boolean }) => Promise<{ ok: boolean; sound: boolean } | null>
       reportAudio: (status: string, detail?: string) => void
       onFocusChange: (cb: (entering: boolean) => void) => void
+      onBubble: (cb: (text: string) => void) => void
     }
   }
 }
@@ -880,6 +881,10 @@ function setupUI() {
 
   // 专注钩子（B 组通过 focus:state 触发，本组只负责表现）
   window.petAPI.onFocusChange((entering) => setFocusState(entering))
+  // 专注结束：主进程发一条唤醒气泡（文案由主进程给，渲染层不硬编码）
+  window.petAPI.onBubble((text) => {
+    if (text) showBubbleText(text)
+  })
   void refreshPrefs()
 }
 

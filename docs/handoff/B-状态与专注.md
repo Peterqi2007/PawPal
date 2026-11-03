@@ -53,14 +53,14 @@
 
 ### B0 · 骨架（0.5 天）
 
-- [ ] 新建 `viewer/capsule.html` / `capsule.css` / `capsule.js` / `capsule-preload.cjs`、`companion.cjs`、`stats-store.cjs`
-- [ ] `main.js` 末尾 `// ==== SECTION: B / status-focus ====` 区，只放 `registerStatusFocus({...})`
+- [x] 新建 `viewer/capsule.html` / `capsule.css` / `capsule.js` / `capsule-preload.cjs`、`companion.cjs`、`stats-store.cjs`
+- [x] `main.js` 末尾 `// ==== SECTION: B / status-focus ====` 区，只放 `registerStatusFocus({...})`
 - [ ] 胶囊窗：
   - 位置：主屏 `workArea` 右上角，边距 12px；监听 `display-metrics-changed` 重算（否则换分辨率会飘出屏）
   - **窗口尺寸固定为展开态**（约 `300×240`），收起时只显示顶部 56px 的胶囊，下方透明——避免动态 `setBounds` 的闪烁与 DPI 抖动
   - `frame: false` / `transparent: true` / `alwaysOnTop: true` / `skipTaskbar: true` / `focusable: false`
   - 点击穿透：`setIgnoreMouseEvents(true, { forward: true })`，指针进入胶囊/面板区才 `false`（照抄 [src/main.ts](../../viewer/src/main.ts) 150–181）
-- [ ] 悬停展开/移出收起：150ms 进、300ms 出（防抖），**不要在展开时抢焦点**（`showInactive()`）
+- [x] 悬停展开/移出收起：150ms 进、300ms 出（防抖），**不要在展开时抢焦点**（`showInactive()`）
 
 ### B1 · 数值系统（1.5 天）⭐ 先交这个
 
@@ -72,40 +72,40 @@
 | 心情 `mood` | 60 | 摸头 +5（**每日合计上限 15** → `moodToday`）/ 打卡 +10 | 100 | — |
 | 打卡 `checkins` | 0 | 每次 [已完成] +1 | 显示 `min(n,3)/3` | 超过 3 不再加分 |
 
-- [ ] `stats-store.cjs`：
+- [x] `stats-store.cjs`：
   - `read(petId)` / `patch(petId, delta)` / `ensureToday(petId)`
   - 文件 `~/.petpet/state/<petId>.json`，**原子写**（写 `.tmp` → `fs.renameSync`），`mode: 0o600`
   - 目录不存在自动创建（教训见 [09-双端适配](../09-双端适配.md) §3「启动不自动创建 `~/.petpet/pets`」那条事故）
   - 跨天：`state.date !== today()` → 重置 `mood/satiety/checkins/moodToday`，`deviceId` 保留
   - `petId` 必须过 `security-utils.cjs` 的 `safePetId`（防路径穿越）
-- [ ] 纯函数（node 直测，**不要测 DOM**）：`applyMood(state, +5)`、`applyFeed(state)`、`applyCheckin(state)`、`dailyReset(state, today)`、`clamp`
-- [ ] IPC：`stats:get(petId)` / `stats:patch(petId, delta)` → **返回新状态**（调用方只信返回值）
-- [ ] 单测 ≥12 例：初始值、上限钳制、每日 15 上限、跨天重置、超 3 次打卡、非法 petId、坏 JSON（应重建而不是崩）
+- [x] 纯函数（node 直测，**不要测 DOM**）：`applyMood(state, +5)`、`applyFeed(state)`、`applyCheckin(state)`、`dailyReset(state, today)`、`clamp`
+- [x] IPC：`stats:get(petId)` / `stats:patch(petId, delta)` → **返回新状态**（调用方只信返回值）
+- [x] 单测 ≥12 例：初始值、上限钳制、每日 15 上限、跨天重置、超 3 次打卡、非法 petId、坏 JSON（应重建而不是崩）
 - [ ] **B1 一交，A 组就能开工**——所以先推这一个 PR（可独立合并）
 
 ### B2 · 状态胶囊 + 今日状态面板（1.5 天）
 
-- [ ] 收起态（56px 高）：圆形头像（**精灵表首帧 + CSS `border-radius:50%`**，不需要新素材）、宠物名、一条状态点（有未完成打卡时主色点）
-- [ ] 展开态：`今日状态` 标题 + 日期行（`11 / 02 周一`）+ 两根细进度条（心情暖红 `--pp-mood-fill` / 饱腹暖橙 `--pp-satiety-fill`）+ 打卡圆点 `2/3`
-- [ ] 数值来源只走 `stats:get`；收到 A 的 `stats:patch` 后主进程广播 `capsule:refresh` 让胶囊刷新（**不要在胶囊里自己算分**）
-- [ ] 悬停展开时指针进入面板区仍保持可交互；移出整个窗口 300ms 后收起
-- [ ] 空态：没有宠物包 / 没有数值文件 → 显示「还没有宠物」而不是空白
-- [ ] 降级：`backdrop-filter` 不支持 → `rgba(246,246,246,.96)` 实底
-- [ ] 深色模式：抄 `style.css` 的 `prefers-color-scheme: dark` 变量块，手测一次
+- [x] 收起态（56px 高）：圆形头像（**精灵表首帧 + CSS `border-radius:50%`**，不需要新素材）、宠物名、一条状态点（有未完成打卡时主色点）
+- [x] 展开态：`今日状态` 标题 + 日期行（`11 / 02 周一`）+ 两根细进度条（心情暖红 `--pp-mood-fill` / 饱腹暖橙 `--pp-satiety-fill`）+ 打卡圆点 `2/3`
+- [x] 数值来源只走 `stats:get`；收到 A 的 `stats:patch` 后主进程广播 `capsule:refresh` 让胶囊刷新（**不要在胶囊里自己算分**）
+- [x] 悬停展开时指针进入面板区仍保持可交互；移出整个窗口 300ms 后收起
+- [x] 空态：没有宠物包 / 没有数值文件 → 显示「还没有宠物」而不是空白
+- [x] 降级：`backdrop-filter` 不支持 → `rgba(246,246,246,.96)` 实底
+- [x] 深色模式：抄 `style.css` 的 `prefers-color-scheme: dark` 变量块，手测一次
 
 ### B3 · 专注模式（1.5 天）
 
-- [ ] 入口：A 的右键菜单发 `focus:request`；托盘菜单也加一项
-- [ ] 设置卡：独立小窗（居中主屏，约 `360×220`，**不做全屏遮罩**——需要全屏透明窗，成本高收益低）
+- [x] 入口：A 的右键菜单发 `focus:request`；托盘菜单也加一项
+- [x] 设置卡：独立小窗（居中主屏，约 `360×220`，**不做全屏遮罩**——需要全屏透明窗，成本高收益低）
   - 大号分钟输入（数字键盘可直接输）+ 预设 `15 / 25 / 45 / 60` + `开始` + `取消`
   - 校验：1–180 的整数，非法输入禁用按钮并给行内提示
-- [ ] 开始：写 `~/.petpet/focus.json`（`{ endAt, minutes }`）→ `send('focus:enter', { minutes })` → 胶囊切专注态
-- [ ] 倒计时：**在胶囊窗显示**（C5）`FOCUS 24:59` + `提前结束` 按钮
+- [x] 开始：写 `~/.petpet/focus.json`（`{ endAt, minutes }`）→ `send('focus:enter', { minutes })` → 胶囊切专注态
+- [x] 倒计时：**在胶囊窗显示**（C5）`FOCUS 24:59` + `提前结束` 按钮
   - 时间基准用 `endAt - Date.now()`，**不要用 `setTimeout` 累加**（避免休眠/换窗漂移）
   - 每秒 tick 用 `setInterval(1000)`，但显示值由时间戳算，`tabular-nums` 防跳动
-- [ ] 结束（自然归零或提前结束）：清 `focus.json` → `send('focus:exit')`（A 恢复桌宠）→ 胶囊回常规态 → 主进程让桌宠播 `wiggle` + 气泡「休息一下，顺便给我换水吧。」
-- [ ] 重启恢复：启动读 `focus.json`，`endAt` 未到 → 继续显示并补发 `focus:enter`；已过 → 清文件（**无双重计时风险**，因为时间是绝对的）
-- [ ] 单测 ≥6 例：`parseMinutes`（非法/0/负数/超 180/小数）、`formatCountdown(ms)`（含 0 与跨时）、`remaining(endAt, now)`
+- [x] 结束（自然归零或提前结束）：清 `focus.json` → `send('focus:exit')`（A 恢复桌宠）→ 胶囊回常规态 → 主进程让桌宠播 `wiggle` + 气泡「休息一下，顺便给我换水吧。」
+- [x] 重启恢复：启动读 `focus.json`，`endAt` 未到 → 继续显示并补发 `focus:enter`；已过 → 清文件（**无双重计时风险**，因为时间是绝对的）
+- [x] 单测 ≥6 例：`parseMinutes`（非法/0/负数/超 180/小数）、`formatCountdown(ms)`（含 0 与跨时）、`remaining(endAt, now)`
 
 ---
 

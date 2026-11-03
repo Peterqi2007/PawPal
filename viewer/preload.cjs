@@ -29,6 +29,8 @@ contextBridge.exposeInMainWorld('petAPI', {
   prefsSet: (patch) => ipcRenderer.invoke('prefs:set', patch),
   reportAudio: (status, detail) => ipcRenderer.send('audio:report', status, detail),
   onFocusChange: (cb) => ipcRenderer.on('focus:state', (_e, entering) => cb(!!entering)),
+  // Part B：专注结束由主进程发一条唤醒气泡（渲染层只负责显示）
+  onBubble: (cb) => ipcRenderer.on('pet:bubble', (_e, text) => cb(String(text || ''))),
   appendActivity: (entry) => ipcRenderer.send('pet:activity', entry),
   listActivity: (petId) => ipcRenderer.invoke('pet:activity:list', petId),
   showContextMenu: (x, y) => ipcRenderer.invoke('menu:showContext', x, y),

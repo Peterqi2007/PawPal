@@ -1,0 +1,147 @@
+/* 专注设置卡（360×236，独立小窗，不做全屏遮罩） */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+:root {
+  --accent: #007AFF;
+  --text-primary: rgba(0, 0, 0, 0.85);
+  --text-secondary: rgba(60, 60, 67, 0.78);
+  --border: rgba(0, 0, 0, 0.12);
+  --btn-bg: rgba(255, 255, 255, 0.72);
+  --card-bg: #f6f6f6;
+  --danger: #D70015;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --accent: #0A84FF;
+    --text-primary: rgba(255, 255, 255, 0.92);
+    --text-secondary: rgba(235, 235, 245, 0.75);
+    --border: rgba(255, 255, 255, 0.18);
+    --btn-bg: rgba(72, 72, 74, 0.85);
+    --card-bg: #2c2c2e;
+    --danger: #FF6961;
+  }
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--card-bg);
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.card {
+  height: 100%;
+  padding: 16px 20px 18px;
+  display: flex;
+  flex-direction: column;
+  -webkit-app-region: drag; /* 无边框窗：整卡可拖动 */
+}
+
+.head { display: flex; align-items: center; justify-content: space-between; }
+h1 { font-size: 15px; font-weight: 650; margin: 0; }
+
+.close {
+  -webkit-app-region: no-drag;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+.close:hover { background: rgba(120, 120, 128, 0.16); color: var(--text-primary); }
+
+.hint {
+  margin: 6px 0 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.input-row {
+  -webkit-app-region: no-drag;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.minutes {
+  width: 108px;
+  padding: 6px 10px;
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1.1;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  background: var(--btn-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  outline: none;
+}
+.minutes:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.22); }
+.unit { font-size: 13px; color: var(--text-secondary); }
+
+.presets {
+  -webkit-app-region: no-drag;
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.presets button {
+  flex: 1;
+  height: 30px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--btn-bg);
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+.presets button:hover { border-color: var(--accent); color: var(--accent); }
+.presets button.active { border-color: var(--accent); color: var(--accent); font-weight: 650; }
+
+.error {
+  min-height: 16px;
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: var(--danger);
+}
+
+.footer {
+  -webkit-app-region: no-drag;
+  margin-top: auto;
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+.footer button {
+  height: 32px;
+  padding: 0 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+}
+.ghost { background: transparent; color: var(--text-primary); }
+.ghost:hover { background: rgba(120, 120, 128, 0.14); }
+.primary {
+  background: var(--accent);
+  border-color: transparent;
+  color: #fff;
+  font-weight: 600;
+}
+.primary:hover { filter: brightness(1.06); }
+.primary:disabled { opacity: 0.45; cursor: not-allowed; filter: none; }
+.primary:focus-visible, .ghost:focus-visible, .close:focus-visible, .presets button:focus-visible {
+  outline: 3px solid rgba(0, 122, 255, 0.35);
+  outline-offset: 1px;
+}

@@ -189,7 +189,7 @@ function attachPersona(dir, persona) {
  * @returns {{statsStore: object, attachPersona: Function, soundEnabled: () => boolean}}
  */
 function registerPetCompanion(deps) {
-  const { ipcMain, app, readUiState, writeUiState } = deps
+  const { ipcMain, app, readUiState, writeUiState, onStatsChange } = deps
   const root = path.join(app.getPath('home'), '.petpet', 'state')
   const statsStore = createStatsStore({ root })
 
@@ -211,6 +211,10 @@ function registerPetCompanion(deps) {
       console.log('[PetPet][数值]', petId, JSON.stringify(r.applied), '→', JSON.stringify({
         mood: r.state.mood, satiety: r.state.satiety, checkins: r.state.checkins
       }))
+      // B 组约定：数值变了广播 capsule:refresh，胶囊不自己算分（docs/handoff/B §B2）
+      if (typeof onStatsChange === 'function') {
+        try { onStatsChange(petId, r.state) } catch (e) { console.error('[PetPet][数值] 刷新回调失败', e) }
+      }
     }
     return r.ok ? { ...r, ...r.state } : r
   })
