@@ -1473,7 +1473,12 @@ app.whenReady().then(() => {
   registerPetpetProtocol()  // N-3：自定义协议（CSP 已放行 petpet:）
   registerMediaProtocol()   // 动画素材协议（petmedia:）
   createWindow()
-  statusFocus.create()      // B-2：右上角状态胶囊（收起 56px，悬停展开）
+  // B-2：右上角状态胶囊（收起 56px，悬停展开）
+  // 测试脚本（scripts/boundary-test.cjs、memtest.cjs）把 getAllWindows()[0] 当主窗口用，
+  // 多开一个窗口会让它们抓错窗口（pet:switch / reminder:fire 发丢）；且内存测试也不该多算一扇窗。
+  if (!process.env.PETPET_MEMTEST) {
+    statusFocus.create()
+  }
   // macOS Dock 图标：示例宠物头像（内嵌 base64，打包后有效；换宠物时替换此图标）
   if (process.platform === 'darwin' && app.dock) {
     try {
