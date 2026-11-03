@@ -1,0 +1,232 @@
+/* B-2 状态胶囊：卡片式、毛玻璃、深色自适应；收起只露一条 56px 的头部 */
+:root {
+  --card-bg: rgba(255, 255, 255, 0.86);
+  --card-border: rgba(15, 23, 42, 0.08);
+  --text: #1f2937;
+  --text-soft: #6b7280;
+  --track: rgba(15, 23, 42, 0.08);
+  --satiety: #f59e0b;
+  --mood: #ec4899;
+  --ok: #22c55e;
+  --warn: #f59e0b;
+  --bad: #ef4444;
+  --radius: 16px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --card-bg: rgba(24, 26, 32, 0.86);
+    --card-border: rgba(255, 255, 255, 0.1);
+    --text: #f3f4f6;
+    --text-soft: #9ca3af;
+    --track: rgba(255, 255, 255, 0.12);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 8px;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+  user-select: none;
+  cursor: default;
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', sans-serif;
+}
+
+/* 窗口按内容高度收放（见 status-focus.cjs 的 COLLAPSED/EXPANDED_HEIGHT）：
+   卡片占满内容区，收起时窗口只剩 56px 一条，避免透明区挡住桌面点击 */
+.capsule {
+  width: 100%;
+  margin: 0;
+  border-radius: var(--radius);
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  color: var(--text);
+  overflow: hidden;
+  transition: box-shadow 200ms ease, transform 200ms ease;
+}
+
+/* 毛玻璃：不支持 backdrop-filter 时保留上面的半透明底，可读性不丢 */
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .capsule {
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+    backdrop-filter: blur(16px) saturate(160%);
+  }
+}
+
+.capsule.expanded {
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
+}
+
+.head {
+  height: 55px; /* 56px 收起高度减去 1px 边框 */
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+}
+
+.avatar {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  border-radius: 10px;
+  background-color: var(--track);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
+.meta {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.name {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hint {
+  font-size: 11px;
+  color: var(--text-soft);
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  border-radius: 50%;
+  background: var(--text-soft);
+}
+
+.dot.ok {
+  background: var(--ok);
+}
+.dot.warn {
+  background: var(--warn);
+}
+.dot.bad {
+  background: var(--bad);
+}
+
+/* 展开面板：用 max-height 过渡，窗口本身尺寸不变（不变形、不抖动） */
+.panel {
+  max-height: 0;
+  opacity: 0;
+  padding: 0 12px;
+  border-top: 1px solid transparent;
+  transition: max-height 180ms ease, opacity 140ms ease, padding 180ms ease;
+}
+
+.capsule.expanded .panel {
+  max-height: 190px;
+  opacity: 1;
+  padding: 10px 12px 12px;
+  border-top-color: var(--card-border);
+}
+
+.panel-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-soft);
+  margin-bottom: 8px;
+}
+
+.date {
+  font-weight: 400;
+}
+
+.stat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.stat .label,
+.checkin .label {
+  font-size: 11px;
+  color: var(--text-soft);
+  width: 26px;
+  flex: 0 0 26px;
+}
+
+.bar {
+  flex: 1 1 auto;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--track);
+  overflow: hidden;
+}
+
+.bar i {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: 3px;
+  transition: width 300ms ease;
+}
+
+#barSatiety {
+  background: var(--satiety);
+}
+
+#barMood {
+  background: var(--mood);
+}
+
+.stat .val {
+  width: 24px;
+  flex: 0 0 24px;
+  text-align: right;
+  font-size: 11px;
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.checkin {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.dots {
+  display: flex;
+  gap: 5px;
+}
+
+.dots i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--track);
+}
+
+.dots i.done {
+  background: var(--mood);
+}
+
+.checkin-text {
+  font-size: 11px;
+  color: var(--text-soft);
+}

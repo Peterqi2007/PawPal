@@ -1454,11 +1454,26 @@ const openRefsArg = process.argv.includes('--open-refs')
 // 这里**不再重复 handle**——同一 channel 注册两次 Electron 会直接抛错，重启即崩。
 // 数值相关的调用一律走 stats:get / stats:patch 两个通道（A 的渲染层与 B 的胶囊共用）。
 
+// B-2 状态胶囊：右上角常驻小窗，只读数值（经 A 的门面 statsStore.read），不另存真源
+const { registerStatusFocus } = require('./status-focus.cjs')
+const statusFocus = registerStatusFocus({
+  app,
+  ipcMain,
+  getPet: () => ({ id: currentPetId, name: currentPetName, actions: currentPetActions }),
+  readStats: (petId) => petCompanion.statsStore.read(petId)
+})
+// 换宠物后推一次刷新（ipcMain.on 可叠加监听，不与 pet:loaded 原有逻辑冲突）
+ipcMain.on('pet:loaded', () => {
+  setTimeout(() => statusFocus.refresh(), 100)
+})
+// ==== SECTION: B / end ====
+
 app.whenReady().then(() => {
   loadReminders()           // P0-5：启动即载入持久化提醒（此前只定义了函数、从未调用 → 重启丢提醒）
   registerPetpetProtocol()  // N-3：自定义协议（CSP 已放行 petpet:）
   registerMediaProtocol()   // 动画素材协议（petmedia:）
   createWindow()
+  statusFocus.create()      // B-2：右上角状态胶囊（收起 56px，悬停展开）
   // macOS Dock 图标：示例宠物头像（内嵌 base64，打包后有效；换宠物时替换此图标）
   if (process.platform === 'darwin' && app.dock) {
     try {

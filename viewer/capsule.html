@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; img-src petpet: data:; style-src 'self' 'unsafe-inline'; script-src 'self'"
+    />
+    <title>状态胶囊</title>
+    <link rel="stylesheet" href="capsule.css" />
+  </head>
+  <body>
+    <div class="capsule" id="capsule">
+      <header class="head">
+        <div class="avatar" id="avatar" aria-hidden="true"></div>
+        <div class="meta">
+          <div class="name" id="name">宠物</div>
+          <div class="hint" id="hint">正在读取状态…</div>
+        </div>
+        <span class="dot" id="dot"></span>
+      </header>
+
+      <section class="panel" id="panel">
+        <div class="panel-title">今日状态<span class="date" id="date"></span></div>
+
+        <div class="stat">
+          <span class="label">饱腹</span>
+          <div class="bar"><i id="barSatiety"></i></div>
+          <span class="val" id="valSatiety">—</span>
+        </div>
+
+        <div class="stat">
+          <span class="label">心情</span>
+          <div class="bar"><i id="barMood"></i></div>
+          <span class="val" id="valMood">—</span>
+        </div>
+
+        <div class="checkin">
+          <span class="label">打卡</span>
+          <span class="dots" id="dots"></span>
+          <span class="checkin-text" id="checkinText">还没打卡</span>
+        </div>
+      </section>
+    </div>
+
+    <script src="capsule.js"></script>
+  </body>
+</html>
