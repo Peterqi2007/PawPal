@@ -10,6 +10,7 @@ import { effectiveWeight } from './temperament' // V2-A: 气质调制器（2026-
 import { resolveHit, buildAlphaMap, toLayoutPoint } from './hit-test'
 import { pickBubble, type BubbleScene } from './persona-bubbles'
 import { expressionOf, thresholdBubble } from './pet-expression'
+import { heartBurstSpec, HEART_BURST_MS, HEART_GLYPH, heartEnd, heartOpacity } from './heart-burst'
 import {
   createQueue, enqueue, currentOf, pendingCount, dismiss,
   type QueueState, type ReminderEntry
@@ -681,6 +682,74 @@ function shakePet() {
 // ===== 数值 → 表现（饱腹<30 瘫倒、>80 跳跃；心情<30 乌云、>80 爱心）=====
 let lastStats: { mood: number; satiety: number } | null = null
 
+// ===== 爱心喷发（心情 > 80）：10 秒内从头心持续喷出爱心，飞出去的过程中快速淡出 =====
+let heartTimers: number[] = []
+let heartBurstOn = false
+let heartBurstDone = false
+
+function stopHeartBurst() {
+  heartTimers.forEach((t) => window.clearTimeout(t))
+  heartTimers = []
+  heartBurstOn = false
+  const host = document.getElementById('pet-hearts')
+  if (host) host.innerHTML = ''
+}
+
+function spawnHeart(p: ReturnType<typeof heartBurstSpec>[number]) {
+  const host = document.getElementById('pet-hearts')
+  if (!host || !heartBurstOn) return
+  const el = document.createElement('span')
+  el.className = 'pp-heart'
+  el.textContent = HEART_GLYPH
+  el.style.fontSize = `${p.size}px`
+  el.style.left = `calc(50% + ${p.x}px)`
+  el.style.top = '42%'
+  host.appendChild(el)
+
+  const end = heartEnd(p)
+  // 透明度按 heartOpacity 曲线取样，保证"15% 之后快速变淡、70% 处彻底消失"
+  const samples = [0, 0.15, 0.3, 0.45, 0.6, 0.7, 1]
+  const frames = samples.map((t) => ({
+    offset: t,
+    opacity: heartOpacity(t) * (t === 0 ? 0 : 1),
+    transform: `translate(calc(-50% + ${Math.round(end.x * t + p.sway * Math.sin(t * Math.PI))}px), calc(-50% + ${Math.round(end.y * t)}px)) scale(${(0.65 + 0.35 * t).toFixed(2)}) rotate(${Math.round(p.rotate * t)}deg)`
+  }))
+  // 第一帧从 0 透明度起步（避免"啪"地出现），t=0 的 offset 必须是 0
+  frames[0].opacity = 0
+
+  const anim = el.animate(frames, { duration: p.life, easing: 'linear', fill: 'forwards' })
+  anim.onfinish = () => el.remove()
+  window.setTimeout(() => el.remove(), p.life + 120)
+}
+
+/** 开始一次 10 秒喷发（只在高心情状态下触发；重复调用不会叠加） */
+function startHeartBurst() {
+  if (heartBurstOn) return
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    // 减少动态偏好：不喷发，直接留一个静态爱心
+    heartBurstDone = true
+    return
+  }
+  heartBurstOn = true
+  heartBurstDone = false
+  const particles = heartBurstSpec({ durationMs: HEART_BURST_MS })
+  for (const p of particles) {
+    const t = window.setTimeout(() => spawnHeart(p), p.startAt)
+    heartTimers.push(t)
+  }
+  // 喷发结束后收尾：停表、清层，并把"状态徽标"留成一个小爱心
+  const done = window.setTimeout(() => {
+    stopHeartBurst()
+    heartBurstDone = true
+    const badge = document.getElementById('pet-overlay')
+    if (badge) {
+      badge.textContent = HEART_GLYPH
+      badge.classList.remove('hidden')
+    }
+  }, HEART_BURST_MS + 50)
+  heartTimers.push(done)
+}
+
 function applyPetExpression(next: { mood?: number; satiety?: number } | null | undefined, opts: { bubble?: boolean } = {}) {
   if (!next) return
   const expr = expressionOf(next)
@@ -692,9 +761,12 @@ function applyPetExpression(next: { mood?: number; satiety?: number } | null | u
   }
   const overlay = document.getElementById('pet-overlay')
   if (overlay) {
-    overlay.textContent = expr.overlay === 'cloud' ? '☁️' : expr.overlay === 'hearts' ? '💗' : ''
-    overlay.classList.toggle('hidden', !expr.overlay)
+    // 爱心走"喷发"，静态徽标只留乌云；喷发结束再补一枚小爱心示意状态
+    overlay.textContent = expr.overlay === 'cloud' ? '☁️' : expr.overlay === 'hearts' && heartBurstDone ? HEART_GLYPH : ''
+    overlay.classList.toggle('hidden', !overlay.textContent)
   }
+  if (expr.overlay === 'hearts') startHeartBurst()
+  else if (heartBurstOn) stopHeartBurst()
   // 只在"跨过阈值"时冒一次气泡，避免每次 +5 都刷屏
   if (opts.bubble !== false) {
     const text = thresholdBubble(lastStats, next)
@@ -903,6 +975,7 @@ function setupUI() {
   window.petAPI.onOpenReminder(() => openReminderPanel())
   // P2-5: 窗口隐藏时暂停动画（省电）——恢复时继续
   window.petAPI.onVisibility((visible) => {
+    if (!visible) stopHeartBurst()
     if (visible) {
       app.ticker.start()
     } else {

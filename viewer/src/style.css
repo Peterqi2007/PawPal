@@ -302,6 +302,26 @@ html, body {
   70%      { transform: translateY(-2px) scale(0.995); }
 }
 
+/* 爱心喷发层：粒子由 JS 用 Web Animations 驱动，这里只管定位与基础样式 */
+.pet-hearts {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  user-select: none;
+  z-index: 4;
+  overflow: hidden;
+}
+.pp-heart {
+  position: absolute;
+  left: 50%;
+  top: 42%;                 /* 头心附近，粒子从这儿向外飞 */
+  transform: translate(-50%, -50%);
+  line-height: 1;
+  will-change: transform, opacity;
+  font-size: 16px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.12));
+}
+
 .pet-overlay {
   position: fixed;
   left: 50%;
