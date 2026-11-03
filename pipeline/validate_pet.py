@@ -29,6 +29,7 @@ VALID_GENDERS = ("公", "母")
 VALID_AGE_STAGES = ("幼年", "成年", "老年")
 VALID_DEVICES = ("Windows", "Mac", "双端")
 VALID_BUILDS = ("细长", "标准", "粗壮", "胖墩")
+VALID_PERSONAS = ("温柔", "傲娇", "搞笑")
 
 # ── 自由文本净化（AI 工具全量审计 V-10：提示注入链 + 间接注入载体）──────
 # 剥离：零宽/不可见（U+200B-200F）、BiDi 覆盖（U+202A-202E、U+2066-2069）、
@@ -162,6 +163,13 @@ def validate_pet_json(data: dict[str, Any], base_dir: str) -> int:
                     if not isinstance(v, (int, float)) or isinstance(v, bool) or not (0 <= v <= 1):
                         errors += 1
                         err(f"temperament.{key} 应为 0-1 数值，实际 {v!r}")
+
+    # persona：说话风格（与 temperament 气质倾向不同——前者决定气泡语气，后者调制行为权重）
+    if "persona" in data:
+        persona = data["persona"]
+        if not isinstance(persona, str) or persona not in VALID_PERSONAS:
+            errors += 1
+            err(f"persona 应为 {VALID_PERSONAS} 之一，实际 {persona!r}")
 
     actions = data.get("actions")
     if not isinstance(actions, dict) or not actions:

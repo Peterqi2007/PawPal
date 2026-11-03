@@ -110,6 +110,15 @@
       },
       "additionalProperties": false
     },
+    "persona": {
+      "type": "string",
+      "enum": [
+        "温柔",
+        "傲娇",
+        "搞笑"
+      ],
+      "description": "宠物人格（说话风格）：决定互动气泡语气，四种场景各一套文案池。与 temperament 不同——temperament 是气质倾向（调制行为权重）。缺省回退 bubbles"
+    },
     "actions": {
       "type": "object",
       "minProperties": 1,
