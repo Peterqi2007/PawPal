@@ -170,6 +170,8 @@ mkdir -p ~/.petpet/pets && cp -r examples/dev-pet ~/.petpet/pets/dev-pet
 # Windows: copy examples\dev-pet to C:\Users\<username>\.petpet\pets\dev-pet
 ```
 
+The installed app **ships with a sample pet, DouDou** (an orange cat, idle + run), auto-installed to `~/.petpet/pets/doudou-demo/` on first launch. If any pet pack already exists it is **not** installed — your data is never overwritten.
+
 `examples/dev-pet` is an **8-action self-test pack** (0.5MB, 256px cells, fully transparent) built to exercise
 interaction / stats / reminders / focus — **not production art**.
 

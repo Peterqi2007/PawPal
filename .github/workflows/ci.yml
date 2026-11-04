@@ -213,6 +213,17 @@ jobs:
             npx asar list "$APP" | grep -q "$f" && echo "✅ $f 已打包" || { echo "❌ $f 缺失"; exit 1; }
           done
         working-directory: viewer
+      - name: 校验示例宠物包已随安装包分发
+        shell: pwsh
+        run: |
+          $dir = "release/win-unpacked/resources/examples/doudou-demo"
+          if (-not (Test-Path "$dir/pet.json")) { throw "❌ 示例宠物包没打进安装包：$dir/pet.json 不存在" }
+          $json = Get-Content "$dir/pet.json" -Raw | ConvertFrom-Json
+          if ($json.id -ne 'doudou-demo') { throw "❌ 示例包 id 异常：$($json.id)" }
+          $sheets = Get-ChildItem "$dir" -Filter *.webp
+          if ($sheets.Count -lt 1) { throw "❌ 示例包精灵表缺失" }
+          Write-Host "✅ 示例宠物包已随包分发：$($json.name) / $($sheets.Count) 张精灵表"
+        working-directory: viewer
       - name: 上传安装包产物
         uses: actions/upload-artifact@v4
         with:

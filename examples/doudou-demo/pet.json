@@ -1,0 +1,45 @@
+{
+  "version": 3,
+  "id": "doudou-demo",
+  "name": "豆豆",
+  "style": "illustration",
+  "bubbles": [
+    "喵～",
+    "摸摸我～",
+    "今天也要开心哦"
+  ],
+  "cellWidth": 512,
+  "cellHeight": 512,
+  "actions": {
+    "idle": {
+      "file": "idle-sheet.webp",
+      "frames": 12,
+      "fps": 5,
+      "loop": true,
+      "weight": 100,
+      "frameWidth": 512,
+      "frameHeight": 512,
+      "scale": 1,
+      "label": "待机",
+      "diary": {
+        "mood": "安逸",
+        "text": "{name}正在待机。"
+      }
+    },
+    "run": {
+      "file": "run-sheet.webp",
+      "frames": 12,
+      "fps": 5,
+      "loop": true,
+      "weight": 10,
+      "frameWidth": 512,
+      "frameHeight": 512,
+      "scale": 1,
+      "label": "奔跑",
+      "diary": {
+        "mood": "兴奋",
+        "text": "{name}正在奔跑。"
+      }
+    }
+  }
+}

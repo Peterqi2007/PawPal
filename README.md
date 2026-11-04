@@ -165,6 +165,9 @@ mkdir -p ~/.petpet/pets && cp -r examples/dev-pet ~/.petpet/pets/dev-pet
 # Windows：把 examples\dev-pet 复制到 C:\Users\<用户名>\.petpet\pets\dev-pet
 ```
 
+安装版**首次启动自带一只示例宠物「豆豆」**（橘猫，待机 + 奔跑两个动作，随安装包分发、自动装到
+`~/.petpet/pets/doudou-demo/`）；目录里已经有任何宠物包时**不会**再安装，绝不覆盖你的数据。
+
 `examples/dev-pet` 是 **8 动作自测包**（0.5MB、256px、全透明底），专门用来验证交互/数值/提醒/专注——**不是正式美术素材**。
 
 ### 跑测试

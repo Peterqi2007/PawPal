@@ -1703,7 +1703,57 @@ app.on('browser-window-focus', () => {
   if (statusFocus && statusFocus.raise) statusFocus.raise()
 })
 
+
+// ── 首次启动：把安装包自带的示例宠物装进用户目录 ─────────────────
+// 目的：新装的应用不该是一片空白。示例包随安装包分发（extraResources），
+// 只有「用户目录里一个宠物包都没有」时才复制，绝不覆盖用户自己的宠物。
+const DEMO_PET_ID = 'doudou-demo'
+
+function bundledDemoDir() {
+  const candidates = [
+    path.join(process.resourcesPath || '', 'examples', DEMO_PET_ID), // 打包后
+    path.join(__dirname, '..', 'examples', DEMO_PET_ID)              // 开发/源码运行
+  ]
+  for (const dir of candidates) {
+    try {
+      if (dir && fs.existsSync(path.join(dir, 'pet.json'))) return dir
+    } catch { /* 忽略 */ }
+  }
+  return null
+}
+
+function hasAnyPetPack() {
+  try {
+    return fs.readdirSync(PETS_ROOT, { withFileTypes: true })
+      .some((e) => e.isDirectory() && /^[a-z0-9_-]+$/i.test(e.name) &&
+        fs.existsSync(path.join(PETS_ROOT, e.name, 'pet.json')))
+  } catch {
+    return false
+  }
+}
+
+function installDemoPetIfEmpty() {
+  try {
+    if (hasAnyPetPack()) return false
+    const src = bundledDemoDir()
+    if (!src) return false
+    const dest = path.join(PETS_ROOT, DEMO_PET_ID)
+    fs.cpSync(src, dest, { recursive: true })
+    console.log('[PawPal] 首次启动：已安装示例宠物', DEMO_PET_ID, '→', dest)
+    // 让界面默认加载它（否则列表里的顺序可能选到别的）
+    try {
+      const st = loadUiState()
+      if (!st.petId) saveUiState({ petId: DEMO_PET_ID })
+    } catch { /* 忽略 */ }
+    return true
+  } catch (e) {
+    console.error('[PawPal] 安装示例宠物失败:', e && e.message)
+    return false
+  }
+}
+
 app.whenReady().then(() => {
+  installDemoPetIfEmpty()  // 首次启动：装示例宠物（空目录才动手）
   loadReminders()           // P0-5：启动即载入持久化提醒（此前只定义了函数、从未调用 → 重启丢提醒）
   registerPetpetProtocol()  // N-3：自定义协议（CSP 已放行 petpet:）
   registerMediaProtocol()   // 动画素材协议（petmedia:）

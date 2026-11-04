@@ -1,6 +1,6 @@
 {
   "name": "pawpal-viewer",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "description": "PawPal 桌面宠物查看器（Electron + PixiJS v8）",
   "main": "main.js",
   "author": "QClaw",
@@ -106,6 +106,12 @@
       "icon": "icon_apple_dog.png",
       "category": "public.app-category.entertainment"
     },
-    "publish": null
+    "publish": null,
+    "extraResources": [
+      {
+        "from": "../examples/doudou-demo",
+        "to": "examples/doudou-demo"
+      }
+    ]
   }
 }
