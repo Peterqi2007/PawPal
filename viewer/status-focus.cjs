@@ -13,10 +13,11 @@ const path = require('path')
 const { BrowserWindow, screen } = require('electron')
 
 // 窗口尺寸 = 卡片尺寸 + 8px 内边距 ×2。收起时只有 56px 一条，
-// 展开时约 160px 面板 —— 窗口高度跟着内容变，透明区才不会挡住桌面点击。
+// 展开时面板约 160px（专注行显示时约 205px）—— 窗口高度跟着内容变，透明区才不会挡住桌面点击。
+// 展开高度按「专注行也显示」的最坏情况给：否则专注中底部按钮会被 .capsule 的 overflow:hidden 裁掉。
 const CAPSULE_WIDTH = 300
 const COLLAPSED_HEIGHT = 74
-const EXPANDED_HEIGHT = 222
+const EXPANDED_HEIGHT = 240
 const EDGE_MARGIN = 12
 
 // pet.json 里动作图可能是 file 也可能是 sprite（两者等价），取第一个能用的

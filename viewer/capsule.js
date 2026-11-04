@@ -143,6 +143,7 @@ function applyFocus(focus) {
   el.focusRow.classList.toggle('show', !!focusState)
   if (!focusState) {
     stopFocusTick()
+    el.focusTime.textContent = '00:00' // 复位残留值，下次专注开始不会闪一下旧时间
     el.hint.textContent = hintOf(lastStats)
     return
   }

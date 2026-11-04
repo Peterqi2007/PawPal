@@ -112,9 +112,9 @@ function registerFocus(deps) {
     active = null
     clearTimer()
     removeFile()
-    send('focus:state', false)
+    if (typeof send === 'function') send('focus:state', false)
     broadcast()
-    if (typeof send === 'function') celebrate()
+    celebrate()
     console.log('[PetPet] 专注结束（' + reason + '），本次 ' + minutes + ' 分钟')
     return { ok: true, minutes }
   }
