@@ -38,7 +38,7 @@ const MAX_ITEMS = 40 // 每组上限：参考图不是素材库，8 个动作够
 const MAX_GROUPS = 20 // 分组上限：一只宠物一组，20 只足够家庭场景
 const MAX_NAME_LEN = 80
 const MAX_GROUP_NAME_LEN = 30
-const DEFAULT_GROUP_NAME = '我的宠物'
+const DEFAULT_GROUP_NAME = '默认分组' // 新库自动建的分组名（旧版叫「我的宠物」，曾被误认成测试图组）
 
 // 宠物档案（跟分组走，装配时写进 pet.json）
 const PET_TYPES = ['猫', '狗', '其他']
@@ -405,6 +405,42 @@ function createRefsStore(rootDir, opts = {}) {
     return { ok: true, items: idx.items }
   }
 
+  /**
+   * 删除整个分组（组内图片与缩略图一并清理）。
+   * 拒绝删除最后一个分组：图库没有分组会让整个界面失去落点，留一个空组更安全。
+   */
+  function deleteGroup(groupId) {
+    const idx = load()
+    const gid = String(groupId || '')
+    if (!GROUP_ID_RE.test(gid)) return { ok: false, error: '分组标识无效' }
+    const group = idx.groups.find((g) => g.id === gid)
+    if (!group) return { ok: false, error: '分组不存在' }
+    if (idx.groups.length <= 1) return { ok: false, error: '至少保留一个分组' }
+
+    const goners = idx.items.filter((it) => it.group === gid)
+    let deletedFiles = 0
+    for (const it of goners) {
+      for (const f of [it.file, it.thumb]) {
+        if (!f) continue
+        try {
+          fs.unlinkSync(path.join(imagesDir, f))
+          deletedFiles++
+        } catch {
+          /* 文件已不在：索引仍要清理 */
+        }
+      }
+    }
+    idx.items = idx.items.filter((it) => it.group !== gid)
+    idx.groups = idx.groups.filter((g) => g.id !== gid)
+    if (idx.lastGroupId === gid) idx.lastGroupId = idx.groups[0].id
+    save(idx)
+    return {
+      ok: true,
+      groupId: gid,
+      removed: { items: goners.length, files: deletedFiles }
+    }
+  }
+
   /** 读缩略图字节（界面通过 IPC 拿 dataURL；不存在返回 null） */
   function getThumb(id) {
     const it = getItem(id)
@@ -490,7 +526,8 @@ function createRefsStore(rootDir, opts = {}) {
     getThumb,
     stats,
     state,
-    setActiveGroup
+    setActiveGroup,
+    deleteGroup
   }
 }
 

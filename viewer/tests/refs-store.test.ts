@@ -329,3 +329,52 @@ describe('多宠物分组（设定图按组唯一）', () => {
     expect(Array.isArray(raw.groups)).toBe(true)
   })
 })
+
+describe('deleteGroup', () => {
+  it('删掉分组时连组内图片文件一起清理', () => {
+    const store = createRefsStore(root, { thumbMaker: fakeThumb })
+    const a = store.createGroup('测试组')
+    const b = store.createGroup('保留组')
+    const buf = png()
+    const r1 = store.addFromBuffer(buf, 'x.png', a.group!.id)
+    const r2 = store.addFromBuffer(buf, 'y.png', b.group!.id)
+    expect(r1.ok && r2.ok).toBe(true)
+
+    const del = store.deleteGroup(a.group!.id)
+    expect(del.ok).toBe(true)
+    expect(del.removed?.items).toBe(1)
+    expect(del.removed?.files).toBe(2) // 原图 + 缩略图
+
+    const after = store.state()
+    expect(after.groups.map((g) => g.name)).not.toContain('测试组')
+    expect(after.items.every((it) => it.group === b.group!.id)).toBe(true)
+    expect(fs.existsSync(path.join(store.imagesDir, r1.item!.file))).toBe(false)
+    expect(fs.existsSync(path.join(store.imagesDir, r2.item!.file))).toBe(true)
+  })
+
+  it('拒绝删除最后一个分组（图库不能空）', () => {
+    const store = createRefsStore(root, { thumbMaker: fakeThumb })
+    const only = store.state().groups[0]
+    const del = store.deleteGroup(only.id)
+    expect(del.ok).toBe(false)
+    expect(del.error).toBe('至少保留一个分组')
+    expect(store.state().groups).toHaveLength(1)
+  })
+
+  it('分组不存在 / 标识非法时返回错误而不是抛异常', () => {
+    const store = createRefsStore(root, { thumbMaker: fakeThumb })
+    expect(store.deleteGroup('g_not_exist').ok).toBe(false)
+    expect(store.deleteGroup('../../etc').ok).toBe(false)
+  })
+
+  it('删掉当前选中分组后，lastGroupId 落到剩下的组', () => {
+    const store = createRefsStore(root, { thumbMaker: fakeThumb })
+    const a = store.createGroup('A 组')
+    store.createGroup('B 组')
+    store.setActiveGroup(a.group!.id)
+    store.deleteGroup(a.group!.id)
+    const after = store.state()
+    expect(after.groups).toHaveLength(1)
+    expect(after.activeGroupId).toBe(after.groups[0].id)
+  })
+})

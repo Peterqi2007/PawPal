@@ -893,6 +893,15 @@ ipcMain.handle('refs:set-role', (_evt, id, role, groupId) => {
   return r.ok ? { ok: true, ...refsState(groupId) } : { ok: false, error: r.error, ...refsState(groupId) }
 })
 
+ipcMain.handle('refs:delete-group', (_evt, groupId) => {
+  try {
+    const r = refsStore.deleteGroup(groupId)
+    return { ...r, state: refsState() }
+  } catch (e) {
+    return { ok: false, error: e && e.message ? e.message : String(e), state: refsState() }
+  }
+})
+
 ipcMain.handle('refs:remove', (_evt, id, groupId) => {
   const r = refsStore.remove(id)
   return r.ok ? { ok: true, ...refsState(groupId) } : { ok: false, error: r.error, ...refsState(groupId) }

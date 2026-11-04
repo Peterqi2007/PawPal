@@ -100,6 +100,33 @@ function renderChips() {
     chip.appendChild(name)
     chip.appendChild(n)
 
+    // 删除分组：hover 出现 ✕，点一次出确认（组内照片一起删，不可恢复）
+    const delGroup = document.createElement('span')
+    delGroup.className = 'chip-del'
+    delGroup.textContent = '✕'
+    delGroup.title = `删除分组「${g.name}」`
+    delGroup.setAttribute('role', 'button')
+    delGroup.setAttribute('aria-label', `删除分组 ${g.name}`)
+    delGroup.addEventListener('click', async (e) => {
+      e.stopPropagation()
+      if (!current || (current.groups || []).length <= 1) {
+        say('至少保留一个分组', true)
+        return
+      }
+      const n = g.count || 0
+      if (!window.confirm(`删除分组「${g.name}」？
+组内 ${n} 张照片会一并删除，不可恢复。`)) return
+      const r = await api.deleteGroup(g.id)
+      if (!r || !r.ok) {
+        say((r && r.error) || '删除失败', true)
+        return
+      }
+      applyState(r.state || r)
+      const removed = (r.removed && r.removed.items) || n
+      say(`已删除分组「${g.name}」（${removed} 张照片）`)
+    })
+    chip.appendChild(delGroup)
+
     chip.addEventListener('click', () => {
       if (g.id === current.activeGroupId) return
       selectGroup(g.id)

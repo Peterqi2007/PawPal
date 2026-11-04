@@ -71,6 +71,13 @@ export interface CreateGroupResult {
   error?: string
 }
 
+export interface DeleteGroupResult {
+  ok: boolean
+  groupId?: string
+  removed?: { items: number; files: number }
+  error?: string
+}
+
 export interface RefsStore {
   rootDir: string
   imagesDir: string
@@ -86,6 +93,8 @@ export interface RefsStore {
   stats(groupId?: string): RefsStoreStats
   state(groupId?: string): RefsState
   setActiveGroup(groupId?: string): RefsState
+  /** 删除整个分组（组内图片一并清理）；拒绝删除最后一个分组 */
+  deleteGroup(groupId: string): DeleteGroupResult
 }
 
 export function createRefsStore(rootDir: string, opts: RefsStoreOptions): RefsStore

@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('refsAPI', {
   addFiles: (items, groupId) => ipcRenderer.invoke('refs:add-buffers', items, groupId),
   setRole: (id, role, groupId) => ipcRenderer.invoke('refs:set-role', id, role, groupId),
   remove: (id, groupId) => ipcRenderer.invoke('refs:remove', id, groupId),
+  deleteGroup: (groupId) => ipcRenderer.invoke('refs:delete-group', groupId),
   thumb: (id) => ipcRenderer.invoke('refs:thumb', id),
 
   // AI 重绘（Seedream）：密钥只在主进程，这里只能拿到脱敏状态

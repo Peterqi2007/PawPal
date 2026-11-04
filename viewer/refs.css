@@ -913,3 +913,32 @@ body {
   .ark-row input, .ark-row select { background: rgba(255, 255, 255, 0.06); color: var(--ink); }
   .btn-gear { background: rgba(255, 255, 255, 0.06); }
 }
+
+/* 分组胶囊上的删除按钮：默认隐藏，hover 时出现 */
+.chip {
+  position: relative;
+}
+
+.chip .chip-del {
+  display: inline-grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  margin-left: 6px;
+  border-radius: 50%;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--text-dim, #9ca3af);
+  opacity: 0;
+  transition: opacity 140ms ease, background 140ms ease, color 140ms ease;
+}
+
+.chip:hover .chip-del,
+.chip:focus-within .chip-del {
+  opacity: 1;
+}
+
+.chip .chip-del:hover {
+  background: rgba(220, 38, 38, 0.14);
+  color: #dc2626;
+}
