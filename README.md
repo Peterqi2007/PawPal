@@ -5,7 +5,7 @@
 ![CI](https://github.com/Peterqi2007/PawPal/actions/workflows/ci.yml/badge.svg)
 ![Release](https://img.shields.io/github/v/release/Peterqi2007/PawPal)
 ![Platform](https://img.shields.io/badge/平台-macOS%20%7C%20Windows-3e7c5a)
-![Tests](https://img.shields.io/badge/vitest-299%20passed-3e7c5a)
+![Tests](https://img.shields.io/badge/vitest-303%20passed-3e7c5a)
 ![License](https://img.shields.io/github/license/Peterqi2007/PawPal)
 
 > **PawPal 不是一个"桌宠播放器"，而是一条从你家宠物照片到桌面替身的完整生产线**：
@@ -68,7 +68,7 @@
 
 | 项 | 现状 |
 |---|---|
-| 单测 | **299 例**（296 通过 / 3 skip）覆盖命中判定、数值状态机、提醒队列、专注计时、精灵表、图库存储、导入安全等 |
+| 单测 | **303 例**（300 通过 / 3 skip）覆盖命中判定、数值状态机、提醒队列、专注计时、精灵表、图库存储、导入安全等 |
 | CI | `素材管线测试`（3.9/3.11/3.12 三组）、`客户端构建`、`macOS 包`、`Windows 安装包` + Boundary Test |
 | 回归脚本 | `viewer/scripts/boundary-test.cjs`（打断/转移边界）、`viewer/scripts/memtest.cjs`（100 次切换纹理平台期） |
 | 安全 | 路径穿越白名单、zip slip 双向拦截、自由文本净化（零宽/BiDi）、密钥 `0600` 仅主进程持有 |
@@ -170,7 +170,7 @@ mkdir -p ~/.petpet/pets && cp -r examples/dev-pet ~/.petpet/pets/dev-pet
 ### 跑测试
 
 ```bash
-cd viewer && npm test          # vitest 299 例
+cd viewer && npm test          # vitest 303 例
 python -m pytest tests/        # 管线单测
 python pipeline/check_refs.py  # 文档矩阵引用完整性
 ```
@@ -244,7 +244,7 @@ PawPal/
 
 ## Roadmap
 
-**✅ 已完成**：素材生产线（图库 / 重绘 / 动画 / 装配 / 校验）· 桌面客户端（多宠、动作转移、提醒三件套、日记、人格气泡、命中判定）· 状态数值与情绪表现 · 状态胶囊 + 专注模式 · CI/Release 自动化 · 299 单测
+**✅ 已完成**：素材生产线（图库 / 重绘 / 动画 / 装配 / 校验）· 桌面客户端（多宠、动作转移、提醒三件套、日记、人格气泡、命中判定）· 状态数值与情绪表现 · 状态胶囊 + 专注模式 · CI/Release 自动化 · 303 单测
 
 **🔨 进行中**：Windows 真机手测闭环 · 手势与交互细化 · 文档与截图补齐
 

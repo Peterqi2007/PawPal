@@ -5,7 +5,7 @@
 ![CI](https://github.com/Peterqi2007/PawPal/actions/workflows/ci.yml/badge.svg)
 ![Release](https://img.shields.io/github/v/release/Peterqi2007/PawPal)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows-3e7c5a)
-![Tests](https://img.shields.io/badge/vitest-299%20passed-3e7c5a)
+![Tests](https://img.shields.io/badge/vitest-303%20passed-3e7c5a)
 ![License](https://img.shields.io/github/license/Peterqi2007/PawPal)
 
 > **PawPal is not a "desktop pet player" — it's a complete production line** from your real pet's photos to a
@@ -71,7 +71,7 @@
 
 | Item | Status |
 |---|---|
-| Unit tests | **299 cases** (296 passing / 3 skipped) covering hit-testing, stats state machine, reminder queue, focus timing, sprite assembly, library storage, import safety |
+| Unit tests | **303 cases** (300 passing / 3 skipped) covering hit-testing, stats state machine, reminder queue, focus timing, sprite assembly, library storage, import safety |
 | CI | `pipeline tests` (3.9 / 3.11 / 3.12 groups), `client build`, `macOS package`, `Windows installer` + a separate Boundary Test workflow |
 | Regression scripts | `viewer/scripts/boundary-test.cjs` (interrupt/transition boundaries), `viewer/scripts/memtest.cjs` (100-switch texture plateau) |
 | Security | Path-traversal allow-list, zip-slip blocked on both ends, text sanitization (zero-width/BiDi), API keys `0600` main-process only |
@@ -176,7 +176,7 @@ interaction / stats / reminders / focus — **not production art**.
 ### Run the tests
 
 ```bash
-cd viewer && npm test          # vitest, 299 cases
+cd viewer && npm test          # vitest, 303 cases
 python -m pytest tests/        # pipeline unit tests
 python pipeline/check_refs.py  # docs matrix reference integrity
 ```
@@ -256,7 +256,7 @@ Full contract: [docs/08-接口协议.md](docs/08-接口协议.md) (Chinese). Cap
 
 **✅ Done**: asset production line (library / restyle / animation / assembly / validation) · desktop client
 (multi-pet, transition chains, reminders, diary, persona bubbles, hit-testing) · stats & expression ·
-status capsule + focus mode · CI/Release automation · 299 unit tests
+status capsule + focus mode · CI/Release automation · 303 unit tests
 
 **🔨 In progress**: Windows hands-on validation loop · gesture/interaction refinements · docs & screenshots
 
