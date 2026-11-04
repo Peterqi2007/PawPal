@@ -2,7 +2,7 @@ name: Commit Message Check
 
 # 检测项（非门禁）：提交信息不得包含具体 AI 工具/厂商/模型名称。
 # 禁词正则由 GitHub Secret（AI_TOOL_NAME_REGEX）提供，仓库内不落明文；
-# Secret 未配置时本 job 自动跳过，配置后生效。未配分支保护时仅事后报警。
+# Secret 未配置时自动跳过（不报错），配置后生效。未配分支保护时仅事后报警。
 
 on:
   push:
@@ -16,12 +16,28 @@ jobs:
   check-commit-message:
     name: 提交信息中性检查（检测项）
     runs-on: ubuntu-latest
-    if: ${{ secrets.AI_TOOL_NAME_REGEX != '' }}
     steps:
+      # 注意：Secret 不能用在 job 级 if（GitHub 不允许 secrets 上下文出现在 job.if 里，
+      # 否则整个 run 会变成 0 jobs 的失败）。先探一次是否配置，再用 step 级 if 门控。
+      - name: 是否已配置禁词
+        id: gate
+        env:
+          REGEX: ${{ secrets.AI_TOOL_NAME_REGEX }}
+        run: |
+          if [ -z "${REGEX}" ]; then
+            echo "跳过：未配置 AI_TOOL_NAME_REGEX（本检查为可选项）"
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/checkout@v4
+        if: steps.gate.outputs.enabled == 'true'
         with:
           fetch-depth: 0
+
       - name: 检查本次触发涉及的提交信息
+        if: steps.gate.outputs.enabled == 'true'
         env:
           REGEX: ${{ secrets.AI_TOOL_NAME_REGEX }}
           BASE: ${{ github.event.before }}
