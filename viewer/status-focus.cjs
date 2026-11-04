@@ -50,7 +50,7 @@ function spriteUrl(petId, rel) {
 }
 
 function registerStatusFocus(deps) {
-  const { app, ipcMain, getPet, readStats, getFocus, onVisibilityChange } = deps
+  const { app, ipcMain, getPet, readStats, getFocus, onVisibilityChange, loadPos, savePos } = deps
   let win = null
   let ignoring = true
   let selftick = null
@@ -110,14 +110,48 @@ function registerStatusFocus(deps) {
     }
   }
 
+  // 默认落在工作区右上角（留 12px 边距）；用户拖过之后就按记忆的位置放
+  function defaultPos() {
+    const area = screen.getPrimaryDisplay().workArea
+    return {
+      x: Math.round(area.x + area.width - CAPSULE_WIDTH - EDGE_MARGIN),
+      y: Math.round(area.y + EDGE_MARGIN)
+    }
+  }
+
+  // 夹回工作区：换屏/改分辨率后位置可能落到屏幕外，别让胶囊"消失"
+  function clampToArea(pos) {
+    const area = screen.getPrimaryDisplay().workArea
+    return {
+      x: Math.min(Math.max(Math.round(pos.x), area.x), area.x + area.width - CAPSULE_WIDTH),
+      y: Math.min(Math.max(Math.round(pos.y), area.y), area.y + area.height - COLLAPSED_HEIGHT)
+    }
+  }
+
+  function currentPos() {
+    if (!win || win.isDestroyed()) return defaultPos()
+    const b = win.getBounds()
+    return { x: b.x, y: b.y }
+  }
+
   function place(target) {
     if (!target || target.isDestroyed()) return
-    const area = screen.getPrimaryDisplay().workArea
-    // 贴住工作区顶边（卡片 CSS 也不再留上内边距），水平仍靠右
-    target.setPosition(
-      Math.round(area.x + area.width - CAPSULE_WIDTH - EDGE_MARGIN),
-      Math.round(area.y)
-    )
+    let pos = null
+    if (typeof loadPos === 'function') {
+      try { pos = loadPos() } catch (e) { pos = null }
+    }
+    const valid = pos && Number.isFinite(pos.x) && Number.isFinite(pos.y)
+    const next = clampToArea(valid ? pos : defaultPos())
+    target.setPosition(next.x, next.y)
+  }
+
+  function persistPos() {
+    if (!win || win.isDestroyed()) return
+    if (typeof savePos !== 'function') return
+    const b = win.getBounds()
+    try { savePos({ x: b.x, y: b.y }) } catch (e) {
+      console.error('[PawPal][胶囊] 位置保存失败:', e && e.message)
+    }
   }
 
   function create() {
@@ -128,7 +162,7 @@ function registerStatusFocus(deps) {
       frame: false,
       transparent: true,
       resizable: false,
-      movable: false,
+      movable: true, // 位置由渲染层拖动 + 主进程 setPosition 控制
       minimizable: false,
       maximizable: false,
       fullscreenable: false,
@@ -196,6 +230,24 @@ function registerStatusFocus(deps) {
   ipcMain.on('capsule:hide', () => hideCapsule())
   // 显隐开关（将来接快捷键也走这里）
   ipcMain.on('capsule:toggle', () => (isVisible() ? hideCapsule() : showCapsule()))
+
+  // 拖动：渲染层按住头部拖动，发位移量过来，主进程移动窗口
+  ipcMain.on('capsule:move-by', (_evt, d) => {
+    if (!win || win.isDestroyed()) return
+    const dx = Math.round(Number(d && d.dx) || 0)
+    const dy = Math.round(Number(d && d.dy) || 0)
+    if (!dx && !dy) return
+    const b = win.getBounds()
+    const next = clampToArea({ x: b.x + dx, y: b.y + dy })
+    if (next.x === b.x && next.y === b.y) return
+    win.setPosition(next.x, next.y)
+  })
+
+  // 松手时落盘，避免拖动过程中频繁写文件
+  ipcMain.on('capsule:moved', () => {
+    persistPos()
+    notifyVisibility() // 顺带刷新菜单（位置相关的勾选项未来会用到）
+  })
 
   ipcMain.on('capsule:ignore-mouse', (_evt, ignore) => {
     if (!win || win.isDestroyed()) return

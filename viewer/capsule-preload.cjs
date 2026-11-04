@@ -11,6 +11,9 @@ contextBridge.exposeInMainWorld('capsule', {
   // 收起按钮：把胶囊藏起来（托盘菜单 「状态胶囊」可恢复）
   hide: () => ipcRenderer.send('capsule:hide'),
   toggle: () => ipcRenderer.send('capsule:toggle'),
+  // 拖动：按住头部移动时发位移，松手时通知落盘
+  moveBy: (dx, dy) => ipcRenderer.send('capsule:move-by', { dx, dy }),
+  dragEnd: () => ipcRenderer.send('capsule:moved'),
   // B-3：胶囊上的「提前结束」交给主进程统一收尾（清 focus.json + 广播状态）
   endFocus: () => ipcRenderer.send('focus:stop'),
   onRefresh: (cb) => {

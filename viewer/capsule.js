@@ -265,6 +265,54 @@ async function refresh() {
 }
 
 // 提前结束：主进程统一收尾（清 focus.json + 广播），胶囊下次刷新就回常规态
+// 拖动：按住头部（✕ 除外）移动整个胶囊
+let dragging = false
+let dragMoved = 0
+let accX = 0
+let accY = 0
+
+el.head.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0) return
+  if (e.target && e.target.closest && e.target.closest('button')) return // ✕ 不触发拖动
+  dragging = true
+  dragMoved = 0
+  accX = 0
+  accY = 0
+  try { el.head.setPointerCapture(e.pointerId) } catch { /* 忽略 */ }
+  e.preventDefault()
+})
+
+window.addEventListener('pointermove', (e) => {
+  if (!dragging) return
+  accX += e.movementX || 0
+  accY += e.movementY || 0
+  // 位移量先攒够 1px 再发，避免每帧都发一次 IPC
+  const dx = Math.trunc(accX)
+  const dy = Math.trunc(accY)
+  if (!dx && !dy) return
+  accX -= dx
+  accY -= dy
+  dragMoved += Math.abs(dx) + Math.abs(dy)
+  if (window.capsule && window.capsule.moveBy) window.capsule.moveBy(dx, dy)
+})
+
+function endDrag(e) {
+  if (!dragging) return
+  dragging = false
+  if (window.capsule && window.capsule.dragEnd) window.capsule.dragEnd()
+  // 松手时指针可能已经移到卡片外：补一次收起，避免面板一直挂着
+  const x = e && typeof e.clientX === 'number' ? e.clientX : null
+  const y = e && typeof e.clientY === 'number' ? e.clientY : null
+  const r = el.capsule.getBoundingClientRect()
+  const outside = x === null || x < r.left || x > r.right || y < r.top || y > r.bottom
+  if (outside) {
+    clearTimeout(outTimer)
+    outTimer = setTimeout(() => { if (!dragging) collapse() }, 120)
+  }
+}
+window.addEventListener('pointerup', endDrag)
+window.addEventListener('pointercancel', endDrag)
+
 // 收起按钮：隐藏胶囊（托盘菜单可恢复）
 el.close.addEventListener('click', (e) => {
   e.stopPropagation()
@@ -287,6 +335,7 @@ el.capsule.addEventListener('mouseenter', () => {
 })
 
 el.capsule.addEventListener('mouseleave', () => {
+  if (dragging) return // 拖动中指针可能短暂离开卡片，先不收起
   clearTimeout(inTimer)
   inTimer = 0
   if (!outTimer) outTimer = setTimeout(() => {

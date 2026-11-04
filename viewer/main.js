@@ -1610,6 +1610,12 @@ const statusFocus = registerStatusFocus({
   getPet: () => ({ id: currentPetId, name: currentPetName, actions: currentPetActions }),
   readStats: (petId) => petCompanion.statsStore.read(petId),
   getFocus: () => focusMode.getState(),
+  // 胶囊位置单独存 ui-state.json 的 capsulePos 字段（与桌宠位置互不覆盖）
+  loadPos: () => {
+    const st = loadUiState()
+    return st.capsulePos || null
+  },
+  savePos: (pos) => saveUiState({ capsulePos: pos }),
   // 显隐变化后重建托盘菜单，保证「💊 状态胶囊」的勾选状态是准的
   onVisibilityChange: () => rebuildTrayMenu()
 })
