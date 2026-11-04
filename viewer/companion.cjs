@@ -9,7 +9,7 @@
 //   **数值状态机与落盘由 viewer/stats-store.cjs 提供**（B 组交付，含跨天重置、
 //   摸头每日上限、打卡前 3 次计分、负向心情、原子写与坏档留证）。
 //   本文件只保留 A 组独有的东西：偏好开关、音效日志、persona 回写，
-//   外加一层薄的 delta 适配（把 A 的 {feed:true} 语义翻译成 stats-store 的增量口径），
+//   外加一层薄的 delta 白名单（只放行打卡与摸头；**喂食只走打卡**，见下方规则），
 //   避免两套规则并存导致"同一次点击加两次分"。
 //
 // 数值规则（以后者为准）：见 stats-store.cjs 顶部注释。
@@ -35,7 +35,7 @@ const SATIETY_INIT = DEFAULT_STATE.satiety
 const MOOD_MAX = 100
 const SATIETY_MAX = 100
 const PET_MOOD_GAIN = PAT_MOOD
-const FEED_SATIETY_GAIN = FEED_SATIETY
+const FEED_SATIETY_GAIN = FEED_SATIETY // 仅作文档与胶囊文案用；入口已收敛到打卡
 const CHECKIN_SATIETY_GAIN = CHECKIN_SATIETY
 const CHECKIN_MOOD_GAIN = CHECKIN_MOOD
 const CHECKIN_DAILY_SCORING = CHECKIN_SCORING
@@ -68,20 +68,20 @@ function dailyReset(state, today) {
 
 /**
  * A 的 delta 方言 → stats-store 的增量口径（纯函数）。
- * A: { feed?: true, checkin?: true, mood?: number }
- * B: { satiety?: number, mood?: number, checkin?: true }
+ * 允许：{ checkin?: true, mood?: number, satiety?: number, missPenalty?: true }
+ * 注意：**不再接受 { feed: true }**——2026-11-04 产品决定：喂食只在提醒的 [已完成] 里
+ * 计一次（打卡口径），点身体不再加饱腹。旧的 feed 入口已删除，避免出现第二条喂食路径。
  */
 function normalizeDelta(delta) {
   const rejected = []
   if (!delta || typeof delta !== 'object') {
     return { toDelta: {}, rejected: ['delta 必须是对象'] }
   }
-  const allowed = ['feed', 'checkin', 'mood', 'satiety', 'missPenalty']
+  const allowed = ['checkin', 'mood', 'satiety', 'missPenalty']
   for (const key of Object.keys(delta)) {
     if (!allowed.includes(key)) rejected.push(key)
   }
   const toDelta = {}
-  if (delta.feed === true) toDelta.satiety = (toDelta.satiety || 0) + FEED_SATIETY_GAIN
   if (delta.checkin === true) toDelta.checkin = true
   if (delta.missPenalty === true) toDelta.missPenalty = true
   if (typeof delta.satiety === 'number' && Number.isFinite(delta.satiety)) {

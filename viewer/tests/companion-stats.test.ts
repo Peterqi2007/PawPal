@@ -71,14 +71,20 @@ describe('跨天重置', () => {
 })
 
 describe('applyStatsPatch 数值规则', () => {
-  it('喂食：饱腹 +20', () => {
-    const r = applyStatsPatch(base(), { feed: true })
+  it('喂食口径已收敛：{feed:true} 被拒绝（只认打卡）', () => {
+    const r = applyStatsPatch(base(), { feed: true } as never)
+    expect(r.rejected).toContain('feed')
+    expect(r.state.satiety).toBe(SATIETY_INIT)
+  })
+
+  it('打卡：饱腹 +20（现为唯一喂食入口）', () => {
+    const r = applyStatsPatch(base(), { checkin: true })
     expect(r.state.satiety).toBe(SATIETY_INIT + FEED_SATIETY_GAIN)
     expect(r.applied.satiety).toBe(FEED_SATIETY_GAIN)
   })
 
-  it('喂食封顶 100（超出部分不累计）', () => {
-    const r = applyStatsPatch(base({ satiety: 95 }), { feed: true })
+  it('打卡封顶 100（超出部分不累计）', () => {
+    const r = applyStatsPatch(base({ satiety: 95 }), { checkin: true })
     expect(r.state.satiety).toBe(SATIETY_MAX)
     expect(r.applied.satiety).toBe(5)
     expect(r.capped.satiety).toBe(true)
@@ -117,7 +123,7 @@ describe('applyStatsPatch 数值规则', () => {
   })
 
   it('未知字段被拒绝且不改数值', () => {
-    const r = applyStatsPatch(base(), { feed: true, hacker: 999 } as never)
+    const r = applyStatsPatch(base(), { checkin: true, hacker: 999 } as never)
     expect(r.rejected).toContain('hacker')
     expect(r.state.satiety).toBe(SATIETY_INIT + FEED_SATIETY_GAIN)
   })
@@ -149,7 +155,7 @@ describe('createStatsStore 落盘', () => {
 
   it('patch 后落盘，重新读取仍是新值', () => {
     const store = createStatsStore({ root: dir, now: () => new Date(2026, 10, 3, 10, 0, 0) })
-    store.patch('dev-pet', { feed: true })
+    store.patch('dev-pet', { checkin: true })
     const again = store.read('dev-pet')
     expect(again.ok).toBe(true)
     if (again.ok) expect(again.state.satiety).toBe(SATIETY_INIT + FEED_SATIETY_GAIN)
@@ -180,7 +186,7 @@ describe('createStatsStore 落盘', () => {
   it('非法 petId 直接拒绝（防路径穿越）', () => {
     const store = createStatsStore({ root: dir })
     expect(store.read('../etc/passwd').ok).toBe(false)
-    expect(store.patch('a/b', { feed: true }).ok).toBe(false)
+    expect(store.patch('a/b', { checkin: true }).ok).toBe(false)
   })
 
   it('原子写不残留 .tmp 文件', () => {

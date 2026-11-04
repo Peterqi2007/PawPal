@@ -11,6 +11,7 @@ import { resolveHit, buildAlphaMap, toLayoutPoint } from './hit-test'
 import { pickBubble, type BubbleScene } from './persona-bubbles'
 import { expressionOf, thresholdBubble, BUBBLE_HAPPY_FULL } from './pet-expression'
 import { isClickGesture } from './click-guard'
+import { tapIntent, FEED_HINT } from './tap-action'
 import { heartBurstSpec, HEART_BURST_MS, HEART_GLYPH, heartEnd, heartOpacity } from './heart-burst'
 import {
   createQueue, enqueue, currentOf, pendingCount, dismiss,
@@ -647,8 +648,9 @@ async function handlePetClick(x: number, y: number) {
     hasAlpha: !!alphaMaps[currentAction], action: currentAction, region
   }))
   if (!region) return // 点到透明区：不响应（不冒泡、不加数值）
-  if (region === 'head') await interactHead()
-  else await interactFeed()
+  // 方案 C：喂食只走提醒的 [已完成]。点身体只给一句提示，绝不改数值。
+  if (tapIntent(region) === 'pat') await interactHead()
+  else interactBodyHint()
 }
 
 /** 饱腹/心情告急时，气泡优先说这件事（"瘫倒喊饿"必须真的喊出来） */
@@ -666,13 +668,14 @@ async function interactHead() {
   showBubbleText(capped ? '今天摸够啦，明天再来～' : undefined, 'head')
 }
 
-/** 喂食：人格气泡 + 饱腹 +20（封顶 100） */
-async function interactFeed() {
-  const r = await statsPatch({ feed: true })
-  const capped = !!r?.capped?.satiety
+/**
+ * 点身体：只做反应 + 提示，不加任何数值。
+ * 饱腹/心情告急时优先说告急（"瘫倒喊饿"要真的喊出来），否则告诉用户去哪喂。
+ */
+function interactBodyHint() {
+  bouncePet()
   const urgent = urgentBubble()
-  if (urgent) return showBubbleText(urgent, 'feed')
-  showBubbleText(capped ? '已经吃得饱饱的啦' : undefined, 'feed')
+  showBubbleText(urgent || FEED_HINT, 'feed')
 }
 
 function bouncePet() {
