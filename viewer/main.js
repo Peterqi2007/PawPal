@@ -1486,6 +1486,7 @@ function openGuideWindow() {
 }
 
 ipcMain.on('guide:open', () => openGuideWindow())
+ipcMain.on('pet:import', () => { handleImportPet() })
 ipcMain.on('guide:close', () => {
   if (guideWindow && !guideWindow.isDestroyed()) guideWindow.close()
 })

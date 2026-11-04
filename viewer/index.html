@@ -13,6 +13,17 @@
   <div class="pet-stage" id="petStage">
     <canvas id="stage"></canvas>
   </div>
+  <!-- 空态：还没有宠物包时显示（替代过去那个大白警告气泡） -->
+  <div id="pet-empty" class="pet-empty hidden" role="status">
+    <div class="pe-paw" aria-hidden="true">🐾</div>
+    <div class="pe-title">还没有宠物</div>
+    <div class="pe-sub">导入一个宠物包就能开始（<b>.petpack</b> / <b>.zip</b> 或整个目录）</div>
+    <div class="pe-actions">
+      <button id="pe-import" class="pe-btn primary" type="button">📦 导入宠物包</button>
+      <button id="pe-refs" class="pe-btn" type="button">🖼 参考图库</button>
+    </div>
+  </div>
+
   <div id="bubble" class="hidden" aria-live="polite" role="status"></div>
 
   <!-- 提醒到点：头顶大气泡（带打卡按钮，取代旧的常显条） -->

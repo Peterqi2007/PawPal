@@ -555,3 +555,96 @@ canvas.pet-canvas.pp-shake {
   accent-color: var(--accent);
   cursor: pointer;
 }
+
+/* ── 空态卡片：还没有宠物包时显示 ─────────────────────────────
+   以前是复用气泡直接塞一段白底警告，桌面上会糊出一大块白框；
+   现在换成小卡片：半透明、圆角、可点（导入 / 打开图库）。 */
+.pet-empty {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 236px;
+  padding: 16px 16px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.16);
+  text-align: center;
+  color: #1f2328;
+  font-size: 12px;
+  line-height: 1.5;
+  backdrop-filter: blur(10px);
+  user-select: none;
+  z-index: 30;
+}
+
+.pet-empty.hidden {
+  display: none;
+}
+
+.pe-paw {
+  font-size: 26px;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+.pe-title {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.pe-sub {
+  color: #6b7280;
+  margin-bottom: 12px;
+}
+
+.pe-sub b {
+  color: #374151;
+  font-weight: 600;
+}
+
+.pe-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pe-btn {
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 9px;
+  background: #fff;
+  color: #374151;
+  font-size: 12px;
+  padding: 7px 10px;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.pe-btn:hover {
+  background: #f6f7f9;
+}
+
+.pe-btn.primary {
+  background: #e07b39;
+  border-color: #d96f2c;
+  color: #fff;
+  font-weight: 600;
+}
+
+.pe-btn.primary:hover {
+  background: #d96f2c;
+}
+
+@media (prefers-color-scheme: dark) {
+  .pet-empty {
+    background: rgba(38, 38, 42, 0.94);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: #f2f2f7;
+  }
+  .pe-sub { color: #9ca3af; }
+  .pe-sub b { color: #d1d5db; }
+  .pe-btn { background: #2f2f34; border-color: rgba(255, 255, 255, 0.12); color: #e5e7eb; }
+  .pe-btn:hover { background: #3a3a40; }
+}

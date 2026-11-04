@@ -46,6 +46,8 @@ contextBridge.exposeInMainWorld('petAPI', {
   // 打开参考图库（主进程已有 refs:open 处理器，这里补一个渲染层入口，便于脚本/未来按钮调用）
   openRefs: () => ipcRenderer.send('refs:open'),
   openGuide: () => ipcRenderer.send('guide:open'),
+  // 空态卡片上的「导入宠物包」：与托盘菜单同一个入口
+  importPet: () => ipcRenderer.send('pet:import'),
   // 状态胶囊显隐（渲染层/自动化脚本可用；托盘与右键菜单是同一个开关）
   toggleCapsule: () => ipcRenderer.send('capsule:toggle'),
   showCapsule: () => ipcRenderer.send('capsule:show'),

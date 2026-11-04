@@ -100,6 +100,8 @@ declare global {
       onFocusChange: (cb: (entering: boolean) => void) => void
       onBubble: (cb: (text: string) => void) => void
       reminderAck: (id: string) => void
+      importPet: () => void
+      openRefs: () => void
       onReminderMissed: (cb: (info: { id: string; state?: { mood: number; satiety: number } }) => void) => void
     }
   }
@@ -334,11 +336,8 @@ async function init() {
     console.error('listPets 失败', err)
   }
   if (pets.length === 0) {
-    // P0（2026-08-09）：Windows 用户看不懂 ~ 路径（老坑复发）——按平台显示实际路径
-    const petsPath = navigator.userAgent.includes('Windows')
-      ? '%USERPROFILE%\\.petpet\\pets'
-      : '~/.petpet/pets'
-    showFatal(`没有找到宠物包。请创建 ${petsPath}/<宠物名>/pet.json（格式见 docs/08-接口协议.md）`)
+    // 首次启动（还没导入任何宠物包）：显示一张小卡片，而不是把大白警告气泡糊在桌面上
+    showEmptyState()
     return
   }
   petId = pets[0]
@@ -347,6 +346,7 @@ async function init() {
   window.petAPI.onPetSwitch((id) => {
     loadPet(id).catch(err => showFatal(err.message))
   })
+  hideEmptyState()
   setupUI()
   startRandomBehavior()
 }
@@ -1137,6 +1137,21 @@ function startRandomBehavior() {
 
 // ================= 启动 =================
 // P0-2：可见的错误反馈（不透明卡片，替代透明窗口里的静默失败）
+
+/** 还没有宠物包时的空态：小卡片 + 导入/图库入口；此时整窗可点（不能穿透，否则按钮点不到） */
+function showEmptyState() {
+  const card = document.getElementById('pet-empty')
+  if (!card) return
+  card.classList.remove('hidden')
+  try { window.petAPI.setIgnoreMouse(false, false) } catch { /* 忽略 */ }
+  document.getElementById('pe-import')?.addEventListener('click', () => window.petAPI.importPet())
+  document.getElementById('pe-refs')?.addEventListener('click', () => window.petAPI.openRefs())
+}
+
+function hideEmptyState() {
+  document.getElementById('pet-empty')?.classList.add('hidden')
+}
+
 function showFatal(msg: string) {
   const bubble = document.getElementById('bubble')!
   bubble.textContent = '⚠️ ' + msg
