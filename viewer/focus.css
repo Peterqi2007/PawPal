@@ -1,0 +1,183 @@
+/* B-3 专注设置卡：360×236 的独立小窗，圆角卡片 + 深色自适应 */
+:root {
+  --card-bg: #ffffff;
+  --card-border: rgba(15, 23, 42, 0.1);
+  --text: #1f2937;
+  --text-soft: #6b7280;
+  --track: rgba(15, 23, 42, 0.06);
+  --accent: #6366f1;
+  --bad: #ef4444;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --card-bg: #1c1f26;
+    --card-border: rgba(255, 255, 255, 0.1);
+    --text: #f3f4f6;
+    --text-soft: #9ca3af;
+    --track: rgba(255, 255, 255, 0.08);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--card-bg);
+  color: var(--text);
+  overflow: hidden;
+  user-select: none;
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', sans-serif;
+}
+
+.card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--card-border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 38px;
+  padding: 0 12px 0 16px;
+  border-bottom: 1px solid var(--card-border);
+  -webkit-app-region: drag; /* 无边框窗靠这块拖 */
+}
+
+.title {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.close {
+  -webkit-app-region: no-drag;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.close:hover {
+  background: var(--track);
+  color: var(--text);
+}
+
+.body {
+  flex: 1 1 auto;
+  padding: 14px 16px 0;
+}
+
+.field {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.field input {
+  width: 96px;
+  padding: 0;
+  border: none;
+  border-bottom: 2px solid var(--track);
+  background: transparent;
+  color: var(--text);
+  font-size: 34px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  outline: none;
+  -webkit-app-region: no-drag;
+}
+
+.field input:focus {
+  border-bottom-color: var(--accent);
+}
+
+.field input.bad {
+  border-bottom-color: var(--bad);
+}
+
+.unit {
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+.presets {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.presets button {
+  flex: 1 1 0;
+  height: 28px;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  background: var(--track);
+  color: var(--text-soft);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.presets button:hover {
+  color: var(--text);
+}
+
+.presets button.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.hint {
+  margin: 10px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-soft);
+}
+
+.hint.bad {
+  color: var(--bad);
+}
+
+.foot {
+  padding: 10px 16px 14px;
+}
+
+.primary {
+  width: 100%;
+  height: 38px;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primary:hover {
+  filter: brightness(1.06);
+}
+
+.primary:disabled {
+  opacity: 0.55;
+  cursor: default;
+}

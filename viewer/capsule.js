@@ -18,7 +18,10 @@ const el = {
   valSatiety: document.getElementById('valSatiety'),
   valMood: document.getElementById('valMood'),
   dots: document.getElementById('dots'),
-  checkinText: document.getElementById('checkinText')
+  checkinText: document.getElementById('checkinText'),
+  focusRow: document.getElementById('focusRow'),
+  focusTime: document.getElementById('focusTime'),
+  endFocus: document.getElementById('endFocus')
 }
 
 let expanded = false
@@ -27,6 +30,9 @@ let inTimer = 0
 let outTimer = 0
 let refreshTimer = 0
 let shrinkTimer = 0
+let focusState = null // { active, minutes, endAt }
+let focusTimer = 0
+let lastStats = null
 
 function setIgnoreMouse(next) {
   if (next === ignoreMouse) return
@@ -95,7 +101,63 @@ function setAvatar(avatar) {
   el.avatar.style.backgroundPosition = 'left center'
 }
 
+// 与 viewer/focus-time.cjs 的 formatCountdown 保持一致（渲染层是普通脚本，不能 require）
+function formatCountdown(ms) {
+  const n = Number(ms)
+  if (!Number.isFinite(n) || n <= 0) return '00:00'
+  const total = Math.ceil(n / 1000)
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
+}
+
+function stopFocusTick() {
+  if (focusTimer) {
+    clearInterval(focusTimer)
+    focusTimer = 0
+  }
+}
+
+// 专注倒计时按 endAt 算（绝对时间），每秒只刷新文字，不向主进程要数据
+function startFocusTick() {
+  if (focusTimer) return
+  focusTimer = setInterval(() => {
+    if (!focusState) {
+      stopFocusTick()
+      return
+    }
+    const left = focusState.endAt - Date.now()
+    if (left <= 0) {
+      stopFocusTick()
+      el.focusTime.textContent = '00:00'
+      el.hint.textContent = 'FOCUS 00:00'
+      refresh() // 主进程会清掉状态并广播，以主进程为准
+      return
+    }
+    const text = formatCountdown(left)
+    el.focusTime.textContent = text
+    el.hint.textContent = 'FOCUS ' + text
+  }, 1000)
+}
+
+function applyFocus(focus) {
+  focusState = focus && focus.active ? focus : null
+  el.focusRow.classList.toggle('show', !!focusState)
+  if (!focusState) {
+    stopFocusTick()
+    el.hint.textContent = hintOf(lastStats)
+    return
+  }
+  const left = Math.max(0, focusState.endAt - Date.now())
+  const text = formatCountdown(left)
+  el.focusTime.textContent = text
+  el.hint.textContent = 'FOCUS ' + text
+  startFocusTick()
+}
+
 function renderEmpty() {
+  lastStats = null
+  focusState = null
+  stopFocusTick()
+  el.focusRow.classList.remove('show')
   el.name.textContent = '还没有宠物'
   el.hint.textContent = '在菜单里挑一只吧'
   el.dot.className = 'dot'
@@ -115,6 +177,7 @@ function render(payload) {
   }
 
   const stats = payload.stats
+  lastStats = stats
   el.name.textContent = payload.name
   el.hint.textContent = hintOf(stats)
   el.dot.className = `dot ${dotClassOf(stats)}`
@@ -137,6 +200,8 @@ function render(payload) {
     el.dots.appendChild(dot)
   }
   el.checkinText.textContent = checkins > 0 ? `今天已打卡 ${checkins} 次` : '还没打卡'
+  // 专注态覆盖头部摘要（FOCUS 24:59），并露出面板里的「提前结束」
+  applyFocus(payload.focus)
 }
 
 async function refresh() {
@@ -147,6 +212,11 @@ async function refresh() {
     console.error('[capsule] 读取状态失败', e)
   }
 }
+
+// 提前结束：主进程统一收尾（清 focus.json + 广播），胶囊下次刷新就回常规态
+el.endFocus.addEventListener('click', () => {
+  if (window.capsule) window.capsule.endFocus()
+})
 
 // 悬停：进入 150ms 展开并接管鼠标；移出 300ms 收起并恢复穿透
 el.capsule.addEventListener('mouseenter', () => {

@@ -7,6 +7,8 @@ contextBridge.exposeInMainWorld('capsule', {
   state: () => ipcRenderer.invoke('capsule:state'),
   setIgnoreMouse: (ignore) => ipcRenderer.send('capsule:ignore-mouse', Boolean(ignore)),
   setExpanded: (expanded) => ipcRenderer.send('capsule:expanded', Boolean(expanded)),
+  // B-3：胶囊上的「提前结束」交给主进程统一收尾（清 focus.json + 广播状态）
+  endFocus: () => ipcRenderer.send('focus:stop'),
   onRefresh: (cb) => {
     const handler = () => cb()
     ipcRenderer.on('capsule:refresh', handler)

@@ -279,6 +279,8 @@ function rebuildTrayMenu() {
   template.push({ type: 'separator' })
   template.push({ label: `📖 ${petName}日记`, click: () => openDiaryWindow(currentPetId || pets[0] || '') })
   template.push({ label: '⏰ 提醒我', click: () => openReminderWithFocus() })
+  // B-3 专注模式：打开设置卡（A 的右键菜单也会发 focus:request 走同一入口，见 focus.cjs）
+  template.push({ label: '⏳ 专注模式', click: () => focusMode.open() })
 
   template.push({ type: 'separator' })
   template.push({ label: '🚪 退出', click: () => app.quit() })
@@ -324,6 +326,7 @@ ipcMain.handle('menu:showContext', (_evt, x, y) => {
     { label: petName, enabled: false },
     { type: 'separator' },
     { label: '⏰ 提醒我', click: () => openReminderWithFocus() },
+    { label: '⏳ 专注模式', click: () => focusMode.open() },
     { label: `📖 ${petName}日记`, click: () => openDiaryWindow(currentPetId || '') },
     { label: '🖼 参考图库', click: () => openRefsWindow() },
     { label: '✏️ 编辑档案', click: () => openRefsWindow() }, // Part A：复用图库窗（改名字/照片/人格）
@@ -1456,15 +1459,25 @@ const openRefsArg = process.argv.includes('--open-refs')
 
 // B-2 状态胶囊：右上角常驻小窗，只读数值（经 A 的门面 statsStore.read），不另存真源
 const { registerStatusFocus } = require('./status-focus.cjs')
+// B-3 专注模式：设置卡 + focus.json 落盘 + 到点归零（先建，胶囊要读它的状态）
+const { registerFocus } = require('./focus.cjs')
+const focusMode = registerFocus({
+  ipcMain,
+  send,
+  onChange: () => statusFocus.refresh()
+})
 const statusFocus = registerStatusFocus({
   app,
   ipcMain,
   getPet: () => ({ id: currentPetId, name: currentPetName, actions: currentPetActions }),
-  readStats: (petId) => petCompanion.statsStore.read(petId)
+  readStats: (petId) => petCompanion.statsStore.read(petId),
+  getFocus: () => focusMode.getState()
 })
 // 换宠物后推一次刷新（ipcMain.on 可叠加监听，不与 pet:loaded 原有逻辑冲突）
 ipcMain.on('pet:loaded', () => {
   setTimeout(() => statusFocus.refresh(), 100)
+  // 渲染层此刻才挂上 focus:state 监听，补发一次（重启恢复的专注也能变暗）
+  setTimeout(() => focusMode.pushState(), 120)
 })
 // ==== SECTION: B / end ====
 
@@ -1479,6 +1492,9 @@ app.whenReady().then(() => {
   if (!process.env.PETPET_MEMTEST) {
     statusFocus.create()
   }
+  // B-3：续上重启前未结束的专注（endAt 已过则清掉 focus.json，不会凭空计时）
+  focusMode.resume()
+  if (!process.env.PETPET_MEMTEST) statusFocus.refresh()
   // macOS Dock 图标：示例宠物头像（内嵌 base64，打包后有效；换宠物时替换此图标）
   if (process.platform === 'darwin' && app.dock) {
     try {

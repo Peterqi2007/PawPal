@@ -10,6 +10,7 @@
   --ok: #22c55e;
   --warn: #f59e0b;
   --bad: #ef4444;
+  --accent: #6366f1;
   --radius: 16px;
 }
 
@@ -135,7 +136,7 @@ body {
 }
 
 .capsule.expanded .panel {
-  max-height: 190px;
+  max-height: 222px;
   opacity: 1;
   padding: 10px 12px 12px;
   border-top-color: var(--card-border);
@@ -229,4 +230,41 @@ body {
 .checkin-text {
   font-size: 11px;
   color: var(--text-soft);
+}
+
+/* B-3 专注：展开面板里多一行（默认不占位，专注中才显示） */
+.focus-row {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--card-border);
+}
+
+.focus-row.show {
+  display: flex;
+}
+
+.focus-time {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.focus-row .end {
+  margin-left: auto;
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  background: var(--track);
+  color: var(--text-soft);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.focus-row .end:hover {
+  color: var(--text);
 }

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'"
+    />
+    <title>专注模式</title>
+    <link rel="stylesheet" href="focus.css" />
+  </head>
+  <body>
+    <div class="card">
+      <header class="head">
+        <span class="title">专注模式</span>
+        <button class="close" id="cancel" title="取消（Esc）">×</button>
+      </header>
+
+      <div class="body">
+        <label class="field" for="minutes">
+          <input id="minutes" type="text" inputmode="numeric" maxlength="3" value="25" autocomplete="off" />
+          <span class="unit">分钟</span>
+        </label>
+
+        <div class="presets" id="presets">
+          <button type="button" data-min="15">15</button>
+          <button type="button" data-min="25" class="on">25</button>
+          <button type="button" data-min="45">45</button>
+          <button type="button" data-min="60">60</button>
+        </div>
+
+        <p class="hint" id="hint">专注期间桌宠会安静下来，到点会提醒你休息</p>
+      </div>
+
+      <footer class="foot">
+        <button class="primary" id="start">开始专注</button>
+      </footer>
+    </div>
+
+    <script src="focus.js"></script>
+  </body>
+</html>

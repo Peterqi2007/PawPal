@@ -16,7 +16,7 @@ const { BrowserWindow, screen } = require('electron')
 // 展开时约 160px 面板 —— 窗口高度跟着内容变，透明区才不会挡住桌面点击。
 const CAPSULE_WIDTH = 300
 const COLLAPSED_HEIGHT = 74
-const EXPANDED_HEIGHT = 190
+const EXPANDED_HEIGHT = 222
 const EDGE_MARGIN = 12
 
 // pet.json 里动作图可能是 file 也可能是 sprite（两者等价），取第一个能用的
@@ -43,7 +43,7 @@ function spriteUrl(petId, rel) {
 }
 
 function registerStatusFocus(deps) {
-  const { app, ipcMain, getPet, readStats } = deps
+  const { app, ipcMain, getPet, readStats, getFocus } = deps
   let win = null
   let ignoring = true
 
@@ -65,6 +65,14 @@ function registerStatusFocus(deps) {
     }
 
     const sprite = pickSprite(pet.actions)
+    // 专注状态由 B-3 的 focus.cjs 持有（只读一份，胶囊不重复计时）
+    let focus = { active: false }
+    try {
+      if (typeof getFocus === 'function') focus = getFocus() || focus
+    } catch (e) {
+      console.error('[capsule] 读取专注状态失败:', e)
+    }
+
     return {
       ok: true,
       petId: pet.id,
@@ -72,7 +80,8 @@ function registerStatusFocus(deps) {
       stats: state
         ? { satiety: state.satiety, mood: state.mood, checkins: state.checkins }
         : null,
-      avatar: sprite ? { url: spriteUrl(pet.id, sprite.rel), action: sprite.action } : null
+      avatar: sprite ? { url: spriteUrl(pet.id, sprite.rel), action: sprite.action } : null,
+      focus
     }
   }
 
