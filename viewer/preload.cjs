@@ -43,4 +43,8 @@ contextBridge.exposeInMainWorld('petAPI', {
   openDiary: (petId) => ipcRenderer.send('diary:open', petId),
   onOpenReminder: (cb) => ipcRenderer.on('open:reminder', () => cb()),
   onVisibility: (cb) => ipcRenderer.on('pet:visibility', (_e, visible) => cb(visible)),  // P2-5: 隐藏时暂停动画
+  // 状态胶囊显隐（渲染层/自动化脚本可用；托盘与右键菜单是同一个开关）
+  toggleCapsule: () => ipcRenderer.send('capsule:toggle'),
+  showCapsule: () => ipcRenderer.send('capsule:show'),
+  hideCapsule: () => ipcRenderer.send('capsule:hide')
 })

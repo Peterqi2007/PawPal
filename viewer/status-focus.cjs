@@ -50,7 +50,7 @@ function spriteUrl(petId, rel) {
 }
 
 function registerStatusFocus(deps) {
-  const { app, ipcMain, getPet, readStats, getFocus } = deps
+  const { app, ipcMain, getPet, readStats, getFocus, onVisibilityChange } = deps
   let win = null
   let ignoring = true
   let selftick = null
@@ -99,6 +99,17 @@ function registerStatusFocus(deps) {
   }
 
   // 贴右上角：用工作区（排除任务栏/Dock），换屏或改分辨率后重新贴一次
+  // 保持在所有窗口之上：$level 对 Windows 就是 TOPMOST，moveTop() 负责在同类窗口间重新排序
+  function keepOnTop(target) {
+    if (!target || target.isDestroyed()) return
+    try {
+      target.setAlwaysOnTop(true, 'screen-saver')
+      target.moveTop()
+    } catch (e) {
+      console.error('[PawPal][胶囊] 置顶失败:', e && e.message)
+    }
+  }
+
   function place(target) {
     if (!target || target.isDestroyed()) return
     const area = screen.getPrimaryDisplay().workArea
@@ -143,6 +154,8 @@ function registerStatusFocus(deps) {
     win.once('ready-to-show', () => {
       place(win)
       win.showInactive() // 不抢焦点
+      // 置顶层兜底：全屏应用/其它置顶窗激活后，Windows 会把我们压到后面 → 重新抬起来
+      keepOnTop(win)
       // 跨天自愈：收起态不会自己展开，每 60s 主动拉一次，读一次就把日期对齐到今天
       if (selftick) clearInterval(selftick)
       selftick = setInterval(() => pushRefresh(), SELFTICK_MS)
@@ -181,6 +194,8 @@ function registerStatusFocus(deps) {
 
   // 收起按钮：隐藏胶囊（托盘菜单「状态胶囊」可恢复）
   ipcMain.on('capsule:hide', () => hideCapsule())
+  // 显隐开关（将来接快捷键也走这里）
+  ipcMain.on('capsule:toggle', () => (isVisible() ? hideCapsule() : showCapsule()))
 
   ipcMain.on('capsule:ignore-mouse', (_evt, ignore) => {
     if (!win || win.isDestroyed()) return
@@ -191,15 +206,28 @@ function registerStatusFocus(deps) {
     else win.setIgnoreMouseEvents(false)
   })
 
+  function notifyVisibility() {
+    if (typeof onVisibilityChange === 'function') {
+      try {
+        onVisibilityChange(isVisible())
+      } catch (e) {
+        console.error('[PawPal][胶囊] 显隐回调失败:', e && e.message)
+      }
+    }
+  }
+
   function hideCapsule() {
     if (win && !win.isDestroyed()) win.hide()
+    notifyVisibility()
   }
 
   function showCapsule() {
     if (!win || win.isDestroyed()) return create()
     if (!win.isVisible()) win.showInactive()
     place(win)
-    refresh()
+    keepOnTop(win)
+    pushRefresh()   // 注意：闭包里的函数叫 pushRefresh，refresh 只是对外的别名
+    notifyVisibility()
   }
 
   function isVisible() {
@@ -208,6 +236,7 @@ function registerStatusFocus(deps) {
 
   return {
     create,
+    raise: () => keepOnTop(win),
     hide: hideCapsule,
     show: showCapsule,
     isVisible,

@@ -268,6 +268,7 @@ function rebuildTrayMenu() {
         if (!statusFocus) return
         if (item.checked) statusFocus.show()
         else statusFocus.hide()
+        rebuildTrayMenu() // 刷新勾选状态
       }
     }
   ]
@@ -316,6 +317,7 @@ function rebuildTrayMenu() {
   template.push({ type: 'separator' })
   template.push({ label: '🚪 退出', click: () => app.quit() })
   console.log('[PawPal][诊断] 菜单动作子项数:', currentPetActions?Object.keys(currentPetActions).length:0)
+  if (process.env.PAWPAL_MENU_DEBUG) console.log('[PawPal][诊断] 托盘菜单项:', template.map(t => t.label || t.type).join(' | '))
   tray.setContextMenu(Menu.buildFromTemplate(template))
 }
 
@@ -364,6 +366,18 @@ ipcMain.handle('menu:showContext', (_evt, x, y) => {
     { type: 'separator' },
     // 隐藏桌宠：从托盘「🐾 显示/隐藏」再叫回来
     { label: '🙈 隐藏桌宠', click: () => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.hide() } },
+    // 胶囊开关也放一份在右键菜单里（托盘里那份不容易找到）
+    {
+      label: '💊 状态胶囊',
+      type: 'checkbox',
+      checked: !statusFocus || statusFocus.isVisible(),
+      click: (item) => {
+        if (!statusFocus) return
+        if (item.checked) statusFocus.show()
+        else statusFocus.hide()
+        rebuildTrayMenu() // 刷新勾选状态
+      }
+    },
     { type: 'separator' }
   ]
   if (currentPetActions && Object.keys(currentPetActions).length > 0) {
@@ -1595,7 +1609,9 @@ const statusFocus = registerStatusFocus({
   ipcMain,
   getPet: () => ({ id: currentPetId, name: currentPetName, actions: currentPetActions }),
   readStats: (petId) => petCompanion.statsStore.read(petId),
-  getFocus: () => focusMode.getState()
+  getFocus: () => focusMode.getState(),
+  // 显隐变化后重建托盘菜单，保证「💊 状态胶囊」的勾选状态是准的
+  onVisibilityChange: () => rebuildTrayMenu()
 })
 // 换宠物后推一次刷新（ipcMain.on 可叠加监听，不与 pet:loaded 原有逻辑冲突）
 ipcMain.on('pet:loaded', () => {
@@ -1604,6 +1620,11 @@ ipcMain.on('pet:loaded', () => {
   setTimeout(() => focusMode.pushState(), 120)
 })
 // ==== SECTION: B / end ====
+
+// 胶囊置顶层兜底：别的窗口拿到焦点后，Windows 可能把我们压到后面
+app.on('browser-window-focus', () => {
+  if (statusFocus && statusFocus.raise) statusFocus.raise()
+})
 
 app.whenReady().then(() => {
   loadReminders()           // P0-5：启动即载入持久化提醒（此前只定义了函数、从未调用 → 重启丢提醒）

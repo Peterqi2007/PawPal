@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('capsule', {
   setHeight: (height) => ipcRenderer.send('capsule:height', Number(height)),
   // 收起按钮：把胶囊藏起来（托盘菜单 「状态胶囊」可恢复）
   hide: () => ipcRenderer.send('capsule:hide'),
+  toggle: () => ipcRenderer.send('capsule:toggle'),
   // B-3：胶囊上的「提前结束」交给主进程统一收尾（清 focus.json + 广播状态）
   endFocus: () => ipcRenderer.send('focus:stop'),
   onRefresh: (cb) => {
