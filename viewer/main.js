@@ -258,7 +258,18 @@ function rebuildTrayMenu() {
     { label: '↺ 重置大小', click: () => send('view:reset') },
     { type: 'separator' },
     // B-3 专注模式：打开设置卡（与右键菜单、A 的 focus:request 同一入口）
-    { label: '⏳ 专注模式', click: () => focusMode && focusMode.open() }
+    { label: '⏳ 专注模式', click: () => focusMode && focusMode.open() },
+    // B-2 胶囊被 X 收起来后，从这里叫回来
+    {
+      label: '💊 状态胶囊',
+      type: 'checkbox',
+      checked: !statusFocus || statusFocus.isVisible(),
+      click: (item) => {
+        if (!statusFocus) return
+        if (item.checked) statusFocus.show()
+        else statusFocus.hide()
+      }
+    }
   ]
 
   // P0-1：多宠切换（列出 PETS_ROOT 下所有宠物包）
@@ -350,6 +361,9 @@ ipcMain.handle('menu:showContext', (_evt, x, y) => {
     { label: `📖 ${petName}日记`, click: () => openDiaryWindow(currentPetId || '') },
     { label: '🖼 参考图库', click: () => openRefsWindow() },
     { label: '✏️ 编辑档案', click: () => openRefsWindow() }, // Part A：复用图库窗（改名字/照片/人格）
+    { type: 'separator' },
+    // 隐藏桌宠：从托盘「🐾 显示/隐藏」再叫回来
+    { label: '🙈 隐藏桌宠', click: () => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.hide() } },
     { type: 'separator' }
   ]
   if (currentPetActions && Object.keys(currentPetActions).length > 0) {

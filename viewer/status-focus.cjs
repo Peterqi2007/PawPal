@@ -16,8 +16,11 @@ const { BrowserWindow, screen } = require('electron')
 // 展开时面板约 160px（专注行显示时约 205px）—— 窗口高度跟着内容变，透明区才不会挡住桌面点击。
 // 展开高度按「专注行也显示」的最坏情况给：否则专注中底部按钮会被 .capsule 的 overflow:hidden 裁掉。
 const CAPSULE_WIDTH = 300
-const COLLAPSED_HEIGHT = 74
-const EXPANDED_HEIGHT = 240
+// 初始高度只是"渲染层量出真实高度之前"的占位；真正的高度由 capsule:height 通道传来，
+// 否则换字体/加一行内容就会把卡片下方的圆角裁掉（2026-11-04 报障）。
+const COLLAPSED_HEIGHT = 66
+const MIN_HEIGHT = 40
+const MAX_HEIGHT = 640
 const EDGE_MARGIN = 12
 // 跨天自愈：数值重置发生在"下一次读写"时（stats-store 的设计），
 // 收起态胶囊不会自己展开，过夜后会一直显示昨天的数字 → 每 60s 主动拉一次。
@@ -99,9 +102,10 @@ function registerStatusFocus(deps) {
   function place(target) {
     if (!target || target.isDestroyed()) return
     const area = screen.getPrimaryDisplay().workArea
+    // 贴住工作区顶边（卡片 CSS 也不再留上内边距），水平仍靠右
     target.setPosition(
       Math.round(area.x + area.width - CAPSULE_WIDTH - EDGE_MARGIN),
-      Math.round(area.y + EDGE_MARGIN)
+      Math.round(area.y)
     )
   }
 
@@ -160,21 +164,24 @@ function registerStatusFocus(deps) {
   // 数据读取通道：胶囊每次展开 / 定时刷新都走这里，不缓存、不落盘
   ipcMain.handle('capsule:state', () => buildPayload())
 
-  // 窗口高度跟着卡片走：若固定 260px 高，收起后下方约 200px 的透明区会吃掉桌面点击
-  // （点不到下面的图标/文件）。渲染层在收起动画结束后才发 false，避免动画被裁掉。
-  ipcMain.on('capsule:expanded', (_evt, expanded) => {
+  // 鼠标穿透：展开期间接管鼠标，移出后立刻交还（不等收起动画）
+  // 高度由渲染层测量后上报（内容驱动的唯一真源）
+  ipcMain.on('capsule:height', (_evt, height) => {
     if (!win || win.isDestroyed()) return
-    const height = expanded ? EXPANDED_HEIGHT : COLLAPSED_HEIGHT
+    const h = Math.round(Number(height))
+    if (!Number.isFinite(h) || h < MIN_HEIGHT || h > MAX_HEIGHT) return
+    const bounds = win.getBounds()
+    if (bounds.height === h) return
     try {
-      const bounds = win.getBounds()
-      if (bounds.height === height) return
-      win.setBounds({ x: bounds.x, y: bounds.y, width: bounds.width, height })
+      win.setBounds({ x: bounds.x, y: bounds.y, width: bounds.width, height: h })
     } catch (e) {
-      console.error('[capsule] 调整窗口高度失败:', e)
+      console.error('[PawPal][胶囊] 调整窗口高度失败:', e)
     }
   })
 
-  // 鼠标穿透：展开期间接管鼠标，移出后立刻交还（不等收起动画）
+  // 收起按钮：隐藏胶囊（托盘菜单「状态胶囊」可恢复）
+  ipcMain.on('capsule:hide', () => hideCapsule())
+
   ipcMain.on('capsule:ignore-mouse', (_evt, ignore) => {
     if (!win || win.isDestroyed()) return
     const next = Boolean(ignore)
@@ -184,8 +191,26 @@ function registerStatusFocus(deps) {
     else win.setIgnoreMouseEvents(false)
   })
 
+  function hideCapsule() {
+    if (win && !win.isDestroyed()) win.hide()
+  }
+
+  function showCapsule() {
+    if (!win || win.isDestroyed()) return create()
+    if (!win.isVisible()) win.showInactive()
+    place(win)
+    refresh()
+  }
+
+  function isVisible() {
+    return !!win && !win.isDestroyed() && win.isVisible()
+  }
+
   return {
     create,
+    hide: hideCapsule,
+    show: showCapsule,
+    isVisible,
     // 宠物切换等时机主动推一次刷新（胶囊自己也会在展开时拉一次，双保险）
     refresh: pushRefresh,
     getWindow: () => win
@@ -197,6 +222,5 @@ module.exports = {
   pickSprite,
   spriteUrl,
   CAPSULE_WIDTH,
-  COLLAPSED_HEIGHT,
-  EXPANDED_HEIGHT
+  COLLAPSED_HEIGHT
 }

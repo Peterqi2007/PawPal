@@ -21,7 +21,10 @@ const el = {
   checkinText: document.getElementById('checkinText'),
   focusRow: document.getElementById('focusRow'),
   focusTime: document.getElementById('focusTime'),
-  endFocus: document.getElementById('endFocus')
+  endFocus: document.getElementById('endFocus'),
+  panel: document.getElementById('panel'),
+  head: document.getElementById('capsule').querySelector('.head'),
+  close: document.getElementById('hideCapsule')
 }
 
 let expanded = false
@@ -32,6 +35,7 @@ let refreshTimer = 0
 let shrinkTimer = 0
 let focusState = null // { active, minutes, endAt }
 let focusTimer = 0
+let recheckTimers = []
 let lastStats = null
 
 function setIgnoreMouse(next) {
@@ -40,13 +44,54 @@ function setIgnoreMouse(next) {
   if (window.capsule) window.capsule.setIgnoreMouse(next)
 }
 
+/**
+ * 内容需要多高：头部 + 面板自然高度 + 边框 + body 内边距。
+ * 不再让主进程猜（之前 COLLAPSED/EXPANDED_HEIGHT 是估的，估小了就把卡片下方圆角裁掉）。
+ */
+function desiredHeight() {
+  const cs = getComputedStyle(document.body)
+  const padTop = parseFloat(cs.paddingTop) || 0
+  const padBottom = parseFloat(cs.paddingBottom) || 0
+  const border = 2 // .capsule 上下各 1px
+  if (expanded) {
+    // scrollHeight 不受 max-height 动画影响（padding 也不参与过渡），展开瞬间就是终态
+    const panelCs = getComputedStyle(el.panel)
+    const panelBorder = parseFloat(panelCs.borderTopWidth) || 0
+    const headH = el.head.getBoundingClientRect().height
+    return Math.ceil(headH + el.panel.scrollHeight + panelBorder + border + padTop + padBottom)
+  }
+  // 收起后尺寸稳定，直接量卡片
+  return Math.ceil(el.capsule.getBoundingClientRect().height + padTop + padBottom)
+}
+
+function reportHeight() {
+  if (window.capsule && window.capsule.setHeight) window.capsule.setHeight(desiredHeight())
+}
+
+/**
+ * 内容变化后重新量一次窗口高度。
+ * 面板数据是异步拉来的（展开瞬间还是占位内容），只在 expand/collapse 时量会量短，
+ * 结果就是面板底部被窗口裁掉 —— 所以每次渲染完都要再量一次。
+ */
+function scheduleReport() {
+  requestAnimationFrame(() => reportHeight())
+}
+
+/** 展开后补量几次：首次渲染 / 字体就绪 / 图片解码都可能让内容再长一点 */
+function recheckHeight() {
+  reportHeight()
+  for (const t of recheckTimers) clearTimeout(t)
+  recheckTimers = [120, 420, 900].map((ms) => setTimeout(reportHeight, ms))
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(reportHeight).catch(() => {})
+}
+
 function expand() {
   if (expanded) return
   expanded = true
   clearTimeout(shrinkTimer)
   shrinkTimer = 0
   el.capsule.classList.add('expanded')
-  if (window.capsule) window.capsule.setExpanded(true) // 窗口长高，完整露出面板
+  recheckHeight() // 窗口按真实内容长高（唯一的高度来源，含几次补量）
   refresh() // 展开时立刻拉一次，避免看到 2 秒前的旧值
   refreshTimer = setInterval(refresh, REFRESH_MS)
 }
@@ -57,12 +102,15 @@ function collapse() {
   el.capsule.classList.remove('expanded')
   clearInterval(refreshTimer)
   refreshTimer = 0
+  for (const t of recheckTimers) clearTimeout(t)
+  recheckTimers = []
   setIgnoreMouse(true) // 立刻交还鼠标，别在收起动画期间挡住桌面点击
   // 收起动画 180ms 结束后再缩窗口，否则面板会被窗口裁掉
   clearTimeout(shrinkTimer)
   shrinkTimer = setTimeout(() => {
     shrinkTimer = 0
-    if (!expanded && window.capsule) window.capsule.setExpanded(false)
+    if (expanded) return
+    reportHeight() // 收起后再量一次，保证下方圆角完整
   }, 220)
 }
 
@@ -169,6 +217,7 @@ function renderEmpty() {
   el.barMood.style.width = '0%'
   el.dots.innerHTML = ''
   el.checkinText.textContent = '还没有数据'
+  scheduleReport()
 }
 
 function render(payload) {
@@ -203,6 +252,7 @@ function render(payload) {
   el.checkinText.textContent = checkins > 0 ? `今天已打卡 ${checkins} 次` : '还没打卡'
   // 专注态覆盖头部摘要（FOCUS 24:59），并露出面板里的「提前结束」
   applyFocus(payload.focus)
+  scheduleReport()
 }
 
 async function refresh() {
@@ -215,9 +265,18 @@ async function refresh() {
 }
 
 // 提前结束：主进程统一收尾（清 focus.json + 广播），胶囊下次刷新就回常规态
+// 收起按钮：隐藏胶囊（托盘菜单可恢复）
+el.close.addEventListener('click', (e) => {
+  e.stopPropagation()
+  if (window.capsule && window.capsule.hide) window.capsule.hide()
+})
+
 el.endFocus.addEventListener('click', () => {
   if (window.capsule) window.capsule.endFocus()
 })
+
+window.addEventListener('load', reportHeight)
+window.addEventListener('resize', () => { if (!expanded) reportHeight() })
 
 // 悬停：进入 150ms 展开并接管鼠标；移出 300ms 收起并恢复穿透
 el.capsule.addEventListener('mouseenter', () => {
