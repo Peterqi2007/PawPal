@@ -460,6 +460,8 @@ function updateTitle() {
 // - reminder：提醒必须显示 → 直接执行
 // - random：随机行为 → 仅在待机时允许（不再打断任何动作）
 function requestAction(name: string, source: 'menu' | 'reminder' | 'random' | 'init' | 'transition' = 'menu') {
+  // 专注期间不切动作（桌宠要保持静止帧）；'init' 是首次加载，放行
+  if (focusOn && source !== 'init') return
   if (!pet || !textures[name] || textures[name].length === 0) return
   if (!shouldPlay({ name, source }, currentAction)) return
   playAction(name, source)
@@ -483,8 +485,10 @@ function playAction(name: string, source: 'menu' | 'reminder' | 'random' | 'init
   }
 
   sprite = new PIXI.AnimatedSprite(frames)
+  const frozen = focusOn // 专注中切动作（如专注结束的 wiggle 之前）也要保持静止
   sprite.anchor.set(0.5)
   sprite.animationSpeed = (act.fps || 4) / 60
+  if (frozen) { sprite.stop(); sprite.gotoAndStop(0) }
   sprite.loop = act.loop !== false
   pingpongDir = 1
 
@@ -679,6 +683,7 @@ function interactBodyHint() {
 }
 
 function bouncePet() {
+  if (focusOn) return // 专注要求完全静止
   const c = app.canvas as HTMLCanvasElement
   noReactUntil = Date.now() + 220
   c.classList.remove('pp-bounce')
@@ -688,6 +693,7 @@ function bouncePet() {
 }
 
 function shakePet() {
+  if (focusOn) return // 专注要求完全静止
   const c = app.canvas as HTMLCanvasElement
   noReactUntil = Date.now() + 420
   c.classList.remove('pp-shake')
@@ -754,6 +760,7 @@ function spawnHeart(p: ReturnType<typeof heartBurstSpec>[number]) {
 
 /** 开始一次 10 秒喷发（只在高心情状态下触发；重复调用不会叠加） */
 function startHeartBurst() {
+  if (focusOn) return // 专注要求完全静止
   if (heartBurstOn) return
   if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
     // 减少动态偏好：不喷发，直接留一个静态爱心
@@ -837,12 +844,30 @@ async function refreshPrefs() {
   if (cb) cb.checked = soundEnabled
 }
 
+/** 专注时把桌宠冻成一张静止帧：停精灵动画、停 CSS 动效、不再弹跳/抖动 */
+function freezePet() {
+  const stage = document.getElementById('petStage')
+  if (stage) stage.classList.add('is-focus-still')
+  if (sprite) {
+    sprite.stop()
+    sprite.gotoAndStop(0) // 停在当前动作的第 0 帧，视觉上就是一张照片
+  }
+}
+
+function unfreezePet() {
+  const stage = document.getElementById('petStage')
+  if (stage) stage.classList.remove('is-focus-still')
+  if (sprite) sprite.play()
+}
+
 /** 专注钩子（B 组通过 focus:state 触发；当前无发送方时是空转） */
 function setFocusState(entering: boolean) {
   focusOn = entering
   const fx = applyFocusState(entering)
   const stage = document.getElementById('petStage')
   if (stage) stage.classList.toggle('is-focused', fx.resting)
+  if (entering) freezePet()
+  else unfreezePet()
   if (app.canvas) app.canvas.setAttribute('aria-label', focusLabel(entering, petDisplayName()))
 }
 

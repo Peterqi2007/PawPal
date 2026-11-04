@@ -366,10 +366,23 @@ canvas.pet-canvas.pp-shake {
   75%      { transform: translateX(6px); }
 }
 
-/* 专注态：桌宠变暗降饱和（B 组通过 focus:enter/exit 触发） */
+/* 专注态：桌宠变暗降饱和 + 完全静止（B 组通过 focus:state 触发） */
 .pet-stage.is-focused {
-  animation-play-state: paused;
+  animation: none; /* 呼吸/摇摆一律停掉 */
   filter: brightness(0.82) saturate(0.55);
+}
+
+/* 专注期间任何子元素都不许动：弹跳、抖动、爱心粒子全部关掉 */
+.pet-stage.is-focus-still,
+.pet-stage.is-focus-still .pet-canvas,
+.pet-stage.is-focus-still .pet-canvas.pp-bounce,
+.pet-stage.is-focus-still .pet-canvas.pp-shake {
+  animation: none !important;
+  transition: none !important;
+}
+
+.pet-stage.is-focus-still #pet-hearts {
+  display: none !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
