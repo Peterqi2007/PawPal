@@ -1476,18 +1476,35 @@ ipcMain.on('refs:close', () => {
 })
 
 // 设置提醒：{ at: ms 时间戳, repeat: 'none'|'daily'|'weekly', text }
+// 手输提醒的类型推断：只认明确的喂食/喂水词，其余保持 custom（避免"开会提醒"也被扣分）
+const KIND_HINTS = [
+  ['feed', /喂食|喂饭|吃饭|干饭|投喂|猫粮|狗粮|零食|罐头/],
+  ['water', /喂水|喝水|换水|饮水|水碗|加水/]
+]
+
+function resolveReminderKind(explicit, text) {
+  if (explicit === 'feed' || explicit === 'water') return explicit
+  const t = String(text || '')
+  for (const [kind, re] of KIND_HINTS) {
+    if (re.test(t)) return kind
+  }
+  return 'custom'
+}
+
 ipcMain.handle('reminder:set', (_evt, spec) => {
   if (!spec || typeof spec.at !== 'number' || spec.at <= Date.now() + 1000) {
     return { error: '时间无效' }
   }
   const repeat = ['none', 'daily', 'weekly'].includes(spec.repeat) ? spec.repeat : 'none'
   const text = String(spec.text || '该办正事啦！').slice(0, 200) // AI 工具审计：限制长度防存储膨胀/UI 溢出
-  // Part A：提醒类型（喂食/喂水/自定义）——只影响气泡图标与文案口吻，属于展示元数据
-  const kind = spec.kind === 'feed' || spec.kind === 'water' ? spec.kind : 'custom'
+  // 提醒类型（喂食/喂水/自定义）：决定到点后是否参与"1 分钟没点就扣分"。
+  // 快捷按钮会直接带 kind；手输文本的按内容兜底推断——否则用户手打"喂食"
+  // 会落成 custom，于是永远不触发漏点惩罚（2026-11-04 报障）。
+  const kind = resolveReminderKind(spec.kind, text)
   const id = 'r' + (++reminderSeq)
   reminders.set(id, { at: spec.at, repeat, text, kind })
   saveReminders()  // P0-5: 持久化
-  console.log(`[PawPal] 提醒已设置 #${id} → ${new Date(spec.at).toLocaleString()} [${repeat}] ${reminders.get(id).text}`)
+  console.log(`[PawPal] 提醒已设置 #${id} → ${new Date(spec.at).toLocaleString()} [${repeat}] ${reminders.get(id).text}（类型 ${kind}${kind === 'custom' ? '，不参与漏点扣分' : '，1 分钟未点将 -30/-30'}）`)
   return { id }
 })
 
