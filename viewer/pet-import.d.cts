@@ -1,4 +1,4 @@
-// PetPet 宠物包导入器类型声明（pet-import.cjs 的 TS 包装）
+// PawPal 宠物包导入器类型声明（pet-import.cjs 的 TS 包装）
 export interface ImportResult {
   ok: boolean
   id?: string

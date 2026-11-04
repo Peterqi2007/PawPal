@@ -13,7 +13,7 @@ require(path.join(__dirname, '..', 'main.js'))
 const { app, BrowserWindow, ipcMain } = require('electron')
 const { saveConfig } = require(path.join(__dirname, '..', 'ark-config.cjs'))
 
-const CONFIG = process.env.PETPET_ARK_CONFIG || path.join(os.homedir(), '.petpet', 'ark.json')
+const CONFIG = process.env.PAWPAL_ARK_CONFIG || path.join(os.homedir(), '.petpet', 'ark.json')
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 async function waitForWindow(pred, timeoutMs = 12000) {

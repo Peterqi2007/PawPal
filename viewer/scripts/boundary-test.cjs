@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// PetPet scheduleTransition 边界测试（F-004）
+// PawPal scheduleTransition 边界测试（F-004）
 //
 // 场景：
 //   A. 手动打断（menu 源）：random 动作播放中手动切换 idle → 不挂转移定时器 → 无意外转移
@@ -13,7 +13,7 @@
 //
 // 动作识别：事件流 pet:action:notify 只有 {mood,text}（日记文案），按文案关键词映射动作名
 'use strict'
-process.env.PETPET_MEMTEST = '1'
+process.env.PAWPAL_MEMTEST = '1'
 const path = require('path')
 const fs = require('fs')
 const os = require('os')

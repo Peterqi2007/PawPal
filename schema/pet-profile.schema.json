@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/stshourenxy-dev/petpet-playbook/schema/pet-profile.schema.json",
+  "$id": "https://github.com/Peterqi2007/PawPal/schema/pet-profile.schema.json",
   "title": "宠物画像（特征收集表）",
   "description": "画像层 16 字段（docs/01-数据模型.md §3.2）。字段名与文档一一对应；生日/到家时间为一行双值。派生字段（ratio/legRatio）由 validator 自动计算，勿手填。",
   "type": "object",

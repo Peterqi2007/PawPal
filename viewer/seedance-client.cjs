@@ -1,4 +1,4 @@
-// PetPet Seedance 视频生成客户端（主进程模块，CommonJS）
+// PawPal Seedance 视频生成客户端（主进程模块，CommonJS）
 //
 // 依据火山方舟官方「创建视频生成任务」文档实现（任务式异步接口）：
 //   POST {base}/contents/generations/tasks        ← 建任务，返回 task id

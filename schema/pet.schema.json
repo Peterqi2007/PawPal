@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/stshourenxy-dev/petpet-playbook/schema/pet.schema.json",
+  "$id": "https://github.com/Peterqi2007/PawPal/schema/pet.schema.json",
   "title": "宠物包契约（pet.json）",
   "description": "运行时宠物包配置（docs/08-接口协议.md §2）。v3：新增 bubbles / diary / label 文案下沉字段，启用 transitions 转移链。",
   "type": "object",

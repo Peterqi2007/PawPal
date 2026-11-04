@@ -1,4 +1,4 @@
-// PetPet 动画绘制类型声明（animator.cjs 的 TS 包装）
+// PawPal 动画绘制类型声明（animator.cjs 的 TS 包装）
 export const MAX_SHEET_WIDTH: number
 export const DEFAULT_CELL: number
 export const DEFAULT_FRAMES: number

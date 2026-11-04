@@ -1,4 +1,4 @@
-// PetPet 参考图库 - preload 桥接
+// PawPal 参考图库 - preload 桥接
 // 最小暴露面：状态查询 + 分组 + CRUD + 缩略图读取 + 关闭；不暴露文件系统与任意 IPC。
 const { contextBridge, ipcRenderer } = require('electron')
 

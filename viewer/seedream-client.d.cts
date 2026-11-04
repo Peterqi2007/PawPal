@@ -1,4 +1,4 @@
-// PetPet Seedream 客户端类型声明（seedream-client.cjs 的 TS 包装）
+// PawPal Seedream 客户端类型声明（seedream-client.cjs 的 TS 包装）
 export const MIN_POSE: number
 export const MAX_POSES: number
 export const MAX_REFS: number

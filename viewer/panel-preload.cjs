@@ -1,4 +1,4 @@
-// PetPet 日记面板 - preload 桥接（最小暴露面：只收数据）
+// PawPal 日记面板 - preload 桥接（最小暴露面：只收数据）
 const { contextBridge, ipcRenderer } = require('electron')
 
 contextBridge.exposeInMainWorld('panelAPI', {

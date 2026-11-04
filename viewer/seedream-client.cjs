@@ -1,4 +1,4 @@
-// PetPet Seedream 生图客户端（主进程模块，CommonJS）
+// PawPal Seedream 生图客户端（主进程模块，CommonJS）
 //
 // 职责：把「参考图库里的一个分组」翻译成一次火山方舟图片生成请求，并解析回图。
 // 网络实现由调用方注入（生产用 Electron 主进程 net.fetch，测试注入假实现），

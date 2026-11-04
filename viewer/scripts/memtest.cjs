@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// PetPet 纹理泄漏压测：多宠切换 N 次，采样渲染进程 / GPU 进程 / GPU 驱动内存（ioreg）
+// PawPal 纹理泄漏压测：多宠切换 N 次，采样渲染进程 / GPU 进程 / GPU 驱动内存（ioreg）
 //
 // 用法（viewer 目录）：
 //   npx electron scripts/memtest.cjs [--switches 100] [--interval 250] [--pets id1,id2]
@@ -9,7 +9,7 @@
 // 判定：前 ~25 次为缓存建立期，之后应进入平台期；
 //       渲染进程 workingSet 后半 vs 前半显著增长（>50MB）→ 疑似泄漏
 'use strict'
-process.env.PETPET_MEMTEST = '1'
+process.env.PAWPAL_MEMTEST = '1'
 const path = require('path')
 const fs = require('fs')
 const os = require('os')

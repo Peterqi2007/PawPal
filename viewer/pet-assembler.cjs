@@ -1,4 +1,4 @@
-// PetPet 桌宠装配器（主进程模块，CommonJS）
+// PawPal 桌宠装配器（主进程模块，CommonJS）
 //
 // 把「动画产物」（~/.petpet/anim/<slug>/<action>-sheet.png）装配成运行时可加载的宠物包：
 //   ~/.petpet/pets/<id>/pet.json + <action>-sheet.png …

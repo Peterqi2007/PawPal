@@ -1,4 +1,4 @@
-// PetPet 桌宠查看器 - preload 桥接
+// PawPal 桌宠查看器 - preload 桥接
 const { contextBridge, ipcRenderer } = require('electron')
 
 contextBridge.exposeInMainWorld('petAPI', {

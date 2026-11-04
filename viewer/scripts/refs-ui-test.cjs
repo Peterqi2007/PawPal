@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// PetPet 参考图库端到端测试（分组 + 导入 → 落盘 → 缩略图渲染 → 角色规则）
+// PawPal 参考图库端到端测试（分组 + 导入 → 落盘 → 缩略图渲染 → 角色规则）
 //
 // 用法（viewer 目录）：
 //   npx electron scripts/refs-ui-test.cjs

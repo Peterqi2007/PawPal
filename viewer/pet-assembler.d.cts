@@ -1,4 +1,4 @@
-// PetPet 桌宠装配器类型声明（pet-assembler.cjs 的 TS 包装）
+// PawPal 桌宠装配器类型声明（pet-assembler.cjs 的 TS 包装）
 export const MAX_SHEET_WIDTH: number
 
 export interface SheetEntry {

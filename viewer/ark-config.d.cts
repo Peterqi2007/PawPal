@@ -1,4 +1,4 @@
-// PetPet 外网生成配置类型声明（ark-config.cjs 的 TS 包装）
+// PawPal 外网生成配置类型声明（ark-config.cjs 的 TS 包装）
 export interface ArkConfig {
   apiKey: string
   baseUrl: string

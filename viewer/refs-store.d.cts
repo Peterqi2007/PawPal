@@ -1,4 +1,4 @@
-// PetPet 参考图库类型声明（refs-store.cjs 的 TS 包装）
+// PawPal 参考图库类型声明（refs-store.cjs 的 TS 包装）
 export type RefRole = 'setup' | 'pose'
 
 export interface RefGroup {

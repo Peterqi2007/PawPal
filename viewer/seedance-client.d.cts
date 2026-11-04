@@ -1,4 +1,4 @@
-// PetPet Seedance 客户端类型声明（seedance-client.cjs 的 TS 包装）
+// PawPal Seedance 客户端类型声明（seedance-client.cjs 的 TS 包装）
 export const DEFAULT_MODEL: string
 export const DEFAULT_DURATION: number
 export const DEFAULT_RATIO: string

@@ -1,4 +1,4 @@
-// PetPet 桌宠查看器 - 主进程
+// PawPal 桌宠查看器 - 主进程
 // Electron 主进程：透明窗口、托盘、IPC 文件读取
 const { app, BrowserWindow, Tray, Menu, ipcMain, screen, nativeImage, protocol, net, dialog } = require('electron')
 const path = require('path')
@@ -45,8 +45,8 @@ try {
 // ── 参考图库：设定图 + 姿势参考图（docs/01 §3.6 / docs/02 §3）───────────
 // 存储：~/.petpet/refs/ —— refs.json 索引 + images/ 原图副本 + 缩略图
 // 「应用数据库」为什么不用 SQLite：见 refs-store.cjs 头注释（纯文件、零原生依赖）
-// PETPET_REFS_DIR：库目录覆盖（集成测试用临时目录，避免污染真实用户库）
-const REFS_ROOT = process.env.PETPET_REFS_DIR || path.join(app.getPath('home'), '.petpet', 'refs')
+// PAWPAL_REFS_DIR：库目录覆盖（集成测试用临时目录，避免污染真实用户库）
+const REFS_ROOT = process.env.PAWPAL_REFS_DIR || path.join(app.getPath('home'), '.petpet', 'refs')
 const THUMB_MAX_EDGE = 640
 const FALLBACK_THUMB_MAX = 2 * 1024 * 1024 // nativeImage 解不了时，小图直接拿原图当缩略图
 
@@ -879,10 +879,10 @@ ipcMain.handle('refs:thumb', (_evt, id) => {
 // ── 参考图库：AI 重绘（Seedream，联网）─────────────────────────
 // 产品规则：分组内必须有设定图且姿势参考图 ≥3 张，否则不发请求、只提示补图（闸门在主进程，
 // 不能只靠前端）。密钥只存在主进程（~/.petpet/ark.json，0600），渲染进程只能拿到脱敏状态。
-// PETPET_ARK_CONFIG：配置路径覆盖（集成测试用临时文件，避免动到真实密钥）
-const ARK_CONFIG_FILE = process.env.PETPET_ARK_CONFIG || path.join(app.getPath('home'), '.petpet', 'ark.json')
+// PAWPAL_ARK_CONFIG：配置路径覆盖（集成测试用临时文件，避免动到真实密钥）
+const ARK_CONFIG_FILE = process.env.PAWPAL_ARK_CONFIG || path.join(app.getPath('home'), '.petpet', 'ark.json')
 // 动画产物根目录（视频 + 精灵表 + pet.json 动作片段）
-const ANIM_ROOT = process.env.PETPET_ANIM_DIR || path.join(app.getPath('home'), '.petpet', 'anim')
+const ANIM_ROOT = process.env.PAWPAL_ANIM_DIR || path.join(app.getPath('home'), '.petpet', 'anim')
 
 // 上传前降采样：4 张原图 base64 可能 50MB+，参考图不需要原始分辨率
 function encodeRefImage(absPath) {
@@ -1599,12 +1599,12 @@ app.whenReady().then(() => {
   // B-2：右上角状态胶囊（收起 56px，悬停展开）
   // 测试脚本（scripts/boundary-test.cjs、memtest.cjs）把 getAllWindows()[0] 当主窗口用，
   // 多开一个窗口会让它们抓错窗口（pet:switch / reminder:fire 发丢）；且内存测试也不该多算一扇窗。
-  if (!process.env.PETPET_MEMTEST) {
+  if (!process.env.PAWPAL_MEMTEST) {
     statusFocus.create()
   }
   // B-3：续上重启前未结束的专注（endAt 已过则清掉 focus.json，不会凭空计时）
   focusMode.resume()
-  if (!process.env.PETPET_MEMTEST) statusFocus.refresh()
+  if (!process.env.PAWPAL_MEMTEST) statusFocus.refresh()
   // macOS Dock 图标：示例宠物头像（内嵌 base64，打包后有效；换宠物时替换此图标）
   if (process.platform === 'darwin' && app.dock) {
     try {

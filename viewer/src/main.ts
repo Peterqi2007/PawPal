@@ -1,4 +1,4 @@
-// PetPet 桌宠查看器 - 渲染引擎（PixiJS v8）
+// PawPal 桌宠查看器 - 渲染引擎（PixiJS v8）
 // 功能：精灵表播放、动作切换、拖拽、缩放、气泡、随机行为
 // 注意：Electron/CSP 环境下必须使用 unsafe-eval 模块（PixiJS v8 依赖）
 import 'pixi.js/unsafe-eval'
@@ -1122,6 +1122,6 @@ function showFatal(msg: string) {
 }
 
 init().catch(err => {
-  console.error('PetPet 启动失败', err)
+  console.error('PawPal 启动失败', err)
   showFatal(err?.message || '启动失败')
 })
