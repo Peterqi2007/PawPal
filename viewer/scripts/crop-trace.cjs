@@ -13,7 +13,7 @@ app.whenReady().then(async () => {
   await win.loadFile(path.join(__dirname, '..', 'animator.html'))
 
   const out = await win.webContents.executeJavaScript(`(async () => {
-    const A = window.PetPetAnimator
+    const A = window.PawPalAnimator
     const v = document.createElement('video')
     v.muted = true; v.preload = 'auto'
     const res = await fetch('petmedia://media/${REL}')

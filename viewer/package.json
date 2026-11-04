@@ -1,7 +1,7 @@
 {
-  "name": "petpet-viewer",
+  "name": "pawpal-viewer",
   "version": "1.3.0",
-  "description": "PetPet 桌面宠物查看器（Electron + PixiJS v8）",
+  "description": "PawPal 桌面宠物查看器（Electron + PixiJS v8）",
   "main": "main.js",
   "author": "QClaw",
   "license": "MIT",
@@ -27,10 +27,10 @@
     "vitest": "^4.1.10",
     "wait-on": "^8.0.1"
   },
-  "productName": "PetPet",
+  "productName": "PawPal",
   "build": {
-    "appId": "com.petpet.desktop",
-    "productName": "PetPet",
+    "appId": "com.pawpal.desktop",
+    "productName": "PawPal",
     "files": [
       "main.js",
       "security-utils.cjs",
@@ -96,7 +96,7 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "shortcutName": "PetPet"
+      "shortcutName": "PawPal"
     },
     "mac": {
       "icon": "icon_apple_dog.png",

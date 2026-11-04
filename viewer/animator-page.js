@@ -1,9 +1,9 @@
-// PetPet 动画绘制 - 隐藏窗口工作线程
+// PawPal 动画绘制 - 隐藏窗口工作线程
 // 职责：视频 → 按时间点抽帧 → 边缘连通域抠图 → 统一画布居中 → 横排拼成精灵表（返回 PNG dataURL）
 // 算法全部来自 animator.cjs（UMD，主进程与这里共用同一份实现）
 
 ;(function () {
-  const A = window.PetPetAnimator
+  const A = window.PawPalAnimator
   const video = document.getElementById('v')
 
   const PAD = A.DEFAULT_PADDING

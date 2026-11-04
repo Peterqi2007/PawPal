@@ -1,4 +1,4 @@
-// PetPet 动画绘制（主进程 + 隐藏渲染窗口共用，UMD）
+// PawPal 动画绘制（主进程 + 隐藏渲染窗口共用，UMD）
 //
 // 把一段动作视频变成桌宠能播的「横向精灵表」，纯本地、零依赖（不需要 ffmpeg / Python / rembg）。
 //
@@ -16,7 +16,7 @@
 ;(function (root, factory) {
   const api = factory()
   if (typeof module === 'object' && module && module.exports) module.exports = api
-  else root.PetPetAnimator = api
+  else root.PawPalAnimator = api
 })(typeof self !== 'undefined' ? self : this, function () {
 
 const MAX_SHEET_WIDTH = 16384

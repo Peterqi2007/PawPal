@@ -124,7 +124,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: 校验 app.asar 关键模块（防 files 白名单漏文件——v1.2.0 事故）
         run: |
-          APP=$(ls -d release/mac*/PetPet.app 2>/dev/null | head -1)
+          APP=$(ls -d release/mac*/PawPal.app 2>/dev/null | head -1)
           test -n "$APP" || { echo "❌ 未找到 .app"; exit 1; }
           for f in main.js pet-import.cjs security-utils.cjs preload.cjs; do
             npx asar list "$APP/Contents/Resources/app.asar" | grep -q "$f" && echo "✅ $f 已打包" || { echo "❌ $f 缺失"; exit 1; }
@@ -133,7 +133,7 @@ jobs:
       - name: 上传安装包产物
         uses: actions/upload-artifact@v4
         with:
-          name: PetPet-macos
+          name: PawPal-macos
           path: viewer/release/*.dmg
           if-no-files-found: error
 
@@ -216,7 +216,7 @@ jobs:
       - name: 上传安装包产物
         uses: actions/upload-artifact@v4
         with:
-          name: PetPet-windows
+          name: PawPal-windows
           path: |
             viewer/release/*.exe
             viewer/release/*.blockmap
@@ -233,12 +233,12 @@ jobs:
       - name: 下载 macOS 安装包
         uses: actions/download-artifact@v4
         with:
-          name: PetPet-macos
+          name: PawPal-macos
           path: artifacts/macos
       - name: 下载 Windows 安装包
         uses: actions/download-artifact@v4
         with:
-          name: PetPet-windows
+          name: PawPal-windows
           path: artifacts/windows
       - name: 创建 Release
         uses: softprops/action-gh-release@v2

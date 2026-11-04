@@ -55,7 +55,10 @@ async function run() {
 
   // 等主窗口切到新宠物并渲染几帧
   await sleep(2600)
-  const petWin = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed() && w.getTitle().includes('PetPet'))
+  // 按 URL 找桌宠窗，不要依赖窗口标题（标题跟着产品名走，改名后这里会静默失效）
+  const petWin = BrowserWindow.getAllWindows().find(
+    (w) => !w.isDestroyed() && /(^|\/)index\.html$/.test(w.webContents.getURL())
+  )
   if (petWin) {
     const img = await petWin.webContents.capturePage()
     fs.writeFileSync(OUT, img.toPNG())
