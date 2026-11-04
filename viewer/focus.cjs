@@ -113,7 +113,7 @@ function registerFocus(deps) {
     if (typeof send === 'function') send('focus:state', false)
     broadcast()
     celebrate()
-    console.log('[PetPet] 专注结束（' + reason + '），本次 ' + minutes + ' 分钟')
+    console.log('[PawPal] 专注结束（' + reason + '），本次 ' + minutes + ' 分钟')
     return { ok: true, minutes }
   }
 

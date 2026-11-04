@@ -446,7 +446,7 @@ function buildAlphaMapFor(name: string, tex: PIXI.Texture | undefined) {
     const rgba = ctx.getImageData(0, 0, size, size).data
     alphaMaps[name] = buildAlphaMap(rgba, size, size, size)
   } catch (e) {
-    console.warn(`[PetPet] alpha 缩略图生成失败（${name}），命中判定退化为区域判定`, e)
+    console.warn(`[PawPal] alpha 缩略图生成失败（${name}），命中判定退化为区域判定`, e)
   }
 }
 
@@ -642,7 +642,7 @@ async function handlePetClick(x: number, y: number) {
     p.x, p.y,
     alphaMaps[currentAction] || null
   )
-  console.debug('[PetPet][命中]', JSON.stringify({
+  console.debug('[PawPal][命中]', JSON.stringify({
     x: Math.round(p.x), y: Math.round(p.y),
     bounds: { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.width), h: Math.round(b.height) },
     hasAlpha: !!alphaMaps[currentAction], action: currentAction, region
@@ -821,7 +821,7 @@ async function statsPatch(delta: StatsDelta): Promise<StatsResponse | null> {
     if (r && r.ok) applyPetExpression(r.state)
     return r && r.ok ? r : null
   } catch (e) {
-    console.warn('[PetPet] 数值更新失败（不影响互动）', e)
+    console.warn('[PawPal] 数值更新失败（不影响互动）', e)
     return null
   }
 }

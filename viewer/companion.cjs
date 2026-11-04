@@ -210,12 +210,12 @@ function registerPetCompanion(deps) {
     const r = statsStore.patch(petId, delta)
     if (r.ok) {
       // 记录**原始 delta**：排查"数值为什么涨"时，光看 applied 分不清是点击喂食、打卡还是惩罚
-      console.log('[PetPet][数值]', petId, 'delta=' + JSON.stringify(delta || {}), JSON.stringify(r.applied), '→', JSON.stringify({
+      console.log('[PawPal][数值]', petId, 'delta=' + JSON.stringify(delta || {}), JSON.stringify(r.applied), '→', JSON.stringify({
         mood: r.state.mood, satiety: r.state.satiety, checkins: r.state.checkins
       }))
       // B 组约定：数值变了广播 capsule:refresh，胶囊不自己算分（docs/handoff/B §B2）
       if (typeof onStatsChange === 'function') {
-        try { onStatsChange(petId, r.state) } catch (e) { console.error('[PetPet][数值] 刷新回调失败', e) }
+        try { onStatsChange(petId, r.state) } catch (e) { console.error('[PawPal][数值] 刷新回调失败', e) }
       }
     }
     return r.ok ? { ...r, ...r.state } : r
@@ -224,7 +224,7 @@ function registerPetCompanion(deps) {
   // 渲染层无法写 ~/.petpet/petpet.log（那只重定向了主进程 console），
   // 音效结果在这里落一行，便于排障与"到底响没响"的可验证性
   ipcMain.on('audio:report', (_evt, status, detail) => {
-    console.log('[PetPet][音效]', String(status || 'unknown'), detail ? String(detail) : '')
+    console.log('[PawPal][音效]', String(status || 'unknown'), detail ? String(detail) : '')
   })
 
   ipcMain.handle('prefs:get', () => ({ sound: soundEnabled() }))
@@ -233,7 +233,7 @@ function registerPetCompanion(deps) {
     const next = {}
     if (patch && typeof patch === 'object' && typeof patch.sound === 'boolean') next.sound = patch.sound
     if (Object.keys(next).length > 0) {
-      try { writeUiState(next) } catch (e) { console.error('[PetPet][偏好] 保存失败', e) }
+      try { writeUiState(next) } catch (e) { console.error('[PawPal][偏好] 保存失败', e) }
     }
     return { ok: true, sound: soundEnabled() }
   })
