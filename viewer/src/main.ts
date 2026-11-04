@@ -451,7 +451,7 @@ function buildAlphaMapFor(name: string, tex: PIXI.Texture | undefined) {
 }
 
 function updateTitle() {
-  if (pet) document.title = `PetPet - ${pet.name}`
+  if (pet) document.title = `PawPal - ${pet.name}`
 }
 
 // ================= 动作播放 =================

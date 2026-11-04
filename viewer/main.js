@@ -239,7 +239,7 @@ function createTray() {
     console.log('[PetPet] 图标加载:', sized.isEmpty() ? 'FAILED' : 'OK', JSON.stringify(sized.getSize()))
     tray = new Tray(sized)
     console.log('[PetPet] Tray 创建成功')
-    tray.setToolTip('PetPet 桌宠')
+    tray.setToolTip('PawPal 桌宠')
     rebuildTrayMenu()
     console.log('[PetPet] 托盘菜单已设置')
   } catch (error) {
@@ -250,7 +250,7 @@ function createTray() {
 function rebuildTrayMenu() {
   const petName = currentPetName || '宠物'
   const template = [
-    { label: 'PetPet 桌宠', enabled: false },
+    { label: 'PawPal 桌宠', enabled: false },
     { type: 'separator' },
     { label: '🐾 显示/隐藏', click: () => toggleWindow() },
     { label: '🔍 放大', click: () => send('view:zoom', 1.15) },
