@@ -1,226 +1,234 @@
-# PetPet Playbook · 桌宠制作方法论
+# PawPal · 从真实照片到会陪伴你的桌面宠物
 
 [English](README.en.md) | **中文**
 
-![CI](https://github.com/stshourenxy-dev/petpet-playbook/actions/workflows/ci.yml/badge.svg)
-![Release](https://img.shields.io/github/v/release/stshourenxy-dev/petpet-playbook)
+![CI](https://github.com/Peterqi2007/PawPal/actions/workflows/ci.yml/badge.svg)
+![Release](https://img.shields.io/github/v/release/Peterqi2007/PawPal)
 ![Platform](https://img.shields.io/badge/平台-macOS%20%7C%20Windows-3e7c5a)
-![License](https://img.shields.io/github/license/stshourenxy-dev/petpet-playbook)
+![Tests](https://img.shields.io/badge/vitest-299%20passed-3e7c5a)
+![License](https://img.shields.io/github/license/Peterqi2007/PawPal)
 
-![红苕桌宠](assets/demo-preview.jpg)
-
-*红苕（一只被做成桌宠的边牧）在桌面上的样子。▶️ [看 5 动作演示动画（GIF ~1MB）](assets/demo.gif)：睡觉 → 抱熊待机 → 撒娇 → 奔跑 → 伸懒腰。素材由 AI 生成 + rembg 管线制作，全流程见本仓库。*
-
-> 不是"又一个桌宠软件"，是**给心爱的宠物做一只活在电脑里的替身**——用 AI 生成它自己的形象、自己的动作、自己的性格，让它在工作时陪着你。
-
-本仓库是一套**完整的方法论**：从宠物特征收集 → AI 素材生成 → 精灵表管线 → 桌宠实现，全程记录真实决策、真实数据、真实踩坑。
-
-> ⚠️ **先对齐预期**：这不是"上传照片 → 自动生成桌宠"的一键工具。AI 生成是抽卡（同提示词可能出不同结果）、主人核实不可替代（AI 会认错宠物特征），所以完整流程需要你亲手走：填特征表、写提示词、生成、选帧。**半自动换来的是可控制**——你决定它长什么样、做什么动作。如果只想要"照片能动起来"，用豆包「照片动起来」就够了，不需要这套。
-
-> 📦 **仓库内容**：方法论（docs/）+ 素材管线脚本（pipeline/）+ **可运行客户端参考实现**（viewer/，Electron + PixiJS，加载你自己的宠物包即可运行，macOS 实测）。
+> **PawPal 不是一个"桌宠播放器"，而是一条从你家宠物照片到桌面替身的完整生产线**：
+> 图库沉淀照片 → AI 重绘出风格化设定图 → AI 生成动作视频 → 本地抽帧抠像拼精灵表 → 一键装配成宠物包 → 桌面客户端加载运行。
+> 它有自己的形象、动作、人格，还会提醒你喝水、陪你专注。
 
 ---
 
-## 这是给谁的
+## 📸 界面一览
 
-- **有宠物的人**：想给自家猫狗做一只"活的"桌面替身——免费开源，**不需要会编程**，但需要耐心走完整管线（AI 生成不是一键，主人核实不可替代）
-- **开发者**：想学习/复用"真实宠物 → 可运行桌宠"的完整生产管线（Python 管线 + Electron/PixiJS 客户端参考实现）
-- **宠物产品人**：研究"宠物数字替身"方向的产品形态、真实数据与踩坑记录
+| 桌面宠物（透明置顶 + 右下角胶囊） | 状态胶囊（悬停展开） | 专注模式（FOCUS 倒计时，桌宠静止） |
+|:---:|:---:|:---:|
+| ![桌面宠物](docs/assets/screenshots/desktop-pet.png) | ![状态胶囊](docs/assets/screenshots/capsule.png) | ![专注模式](docs/assets/screenshots/focus.png) |
 
-**不适用于**：只想让照片动起来（豆包「照片动起来」即可）；想要现成宠物素材库（VPet/创意工坊更合适）。**本仓库不做"上传照片 → 自动出桌宠"的一键工具，也不提供通用宠物素材**。
+| 参考图库（分组 / 缩略图 / 装配） | 宠物档案（类型与人格） | 动画生成（精灵表预览） |
+|:---:|:---:|:---:|
+| ![参考图库](docs/assets/screenshots/refs.png) | ![宠物档案](docs/assets/screenshots/profile.png) | ![动画生成](docs/assets/screenshots/animator.png) |
 
----
+> 截图来自 Windows 实机（豆豆，一只橘猫）。动画生成那张是本地「↻ 重抽帧」跑出来的真实预览（用已下载的 mp4 重新抽帧，不消耗云端额度）。
+> 历史素材仍在 `assets/`：`demo-preview.jpg`（红苕桌宠实拍）、`demo.gif`（5 动作演示）。
 
-## 与其他桌宠项目的区别
 
-| 项目 | star | 定位 | 与本文档的关系 |
-|------|------|------|---------------|
-| VPet | 6588 | 通用桌宠模拟器（Steam + 创意工坊） | 消费现成素材，无照片→桌宠管线 |
-| Clawd-on-desk | 5863 | AI 编程助手状态可视化 | 面向 AI 状态，非真实宠物 |
-| PPet | 2033 | Live2D 模型加载器 | 需现成模型资产，无生产管线 |
-| HermesPet | 595 | macOS 原生 AI 伴侣 | AI 对话定位，非宠物替身 |
-| MiniCPM Desk Pet | 416 | 本地模型桌宠（Clawd 二开） | 壳+模型，素材仍需人工 |
-| **本仓库** | — | **从真实宠物照片到桌宠的完整生产管线** | 方法论 + 脚本 + 客户端，可与任何壳配合 |
 
-> 主流桌宠项目都是「消费现成素材」，本文档所在的位置是「**生产端**」：从你家宠物的真实照片出发，生成它自己的形象、动作与性格（star 为 2026-08 GitHub API 实测；完整赛道对比见 [03-需求梳理.md](docs/03-需求梳理.md)）。
+## 先对齐预期
+
+- **半自动，不是一键**：AI 生成是抽卡（同提示词出图不同），**主人核实不可替代**（AI 会认错宠物特征）。你决定它长什么样、做什么动作。
+- **不提供现成素材**：本仓库给的是**生产线 + 参考客户端**，宠物形象请你用自己的照片跑出来。
+- **只想要"照片动起来"**：用平台自带的"照片动起来"即可，不需要这套。
 
 ---
 
-## 快速开始（跑素材管线）
+## 现在能做什么
+
+### 素材生产（面板一键，或命令行）
+
+| 能力 | 说明 |
+|---|---|
+| 参考图库 | 多宠分组、设定图/姿势参考两种角色、缩略图网格、拖拽与批量导入、单张 ≤10MB fail-closed |
+| AI 重绘 | 把真实照片重绘成「四边绿幕」的风格化设定图（Seedream）；就绪度闸门（设定图 ≥1 且姿势参考 ≥3 才发请求） |
+| 动画生成 | Seedance 出动作视频 → **本地**抽帧 + 边缘连通域抠像 + 横排拼表（不依赖 ffmpeg/Python）；任务 `taskId` 落盘可追溯，超时后仍可补下载再本地重抽 |
+| 宠物包装配 | 产物 → `~/.petpet/pets/<id>/`（`pet.json` v3 + 精灵表），重名自动加序号，装完自动切换 |
+| 契约校验 | `pipeline/validate_pet.py` 校验字段/纹理上限（`帧数 × 格宽 ≤ 16384px`）/自由文本净化 |
+
+### 桌面客户端（`viewer/`，Electron + PixiJS）
+
+| 能力 | 说明 |
+|---|---|
+| 多宠与动作 | 托盘/右键切换宠物；8+ 动作按权重随机 + `transitions` 行为转移链（手动切换不被自动打断） |
+| 窗口交互 | 无边框透明置顶、拖拽移动、滚轮缩放（窗口跟随、夹回工作区）、**透明区鼠标穿透** |
+| 提醒 | 面板/托盘建提醒（本地持久化）；到点**音效 + 抖动 + 头顶大气泡**，`[已完成]` 打卡，多条排队显示「还有 N 条」 |
+| 左键分区 | 点**头部** = 摸头（心情 +5）；点**身体** = 提示喂食入口（**不加任何数值**） |
+| 人格气泡 | `persona`（温柔/傲娇/搞笑）× 4 场景文案池，缺省回退 `bubbles` |
+| 日记 | 从行为事件沉淀 `activity.json`，独立面板查看 |
+| 状态数值 | 饱腹/心情/打卡：跨天重置、摸头日上限 15、**喂食只在提醒 `[已完成]` 里计一次**、漏点 1 分钟 −30 保底 0 |
+| 情绪表现 | 饱腹 <30 瘫倒喊饿、>80 蹦 3 下；心情 <30 背对+乌云、>80 **爱心喷发 10 秒** |
+| 状态胶囊 | 右上角常驻小窗：收起 56px 一条，悬停展开今日状态；透明区穿透、不抢焦点 |
+| 专注模式 | 托盘/右键开设置卡（1–180 分钟）→ 胶囊走秒 → 桌宠变暗暂停随机 → 归零唤醒 |
+
+### 工程与质量
+
+| 项 | 现状 |
+|---|---|
+| 单测 | **299 例**（296 通过 / 3 skip）覆盖命中判定、数值状态机、提醒队列、专注计时、精灵表、图库存储、导入安全等 |
+| CI | `素材管线测试`（3.9/3.11/3.12 三组）、`客户端构建`、`macOS 包`、`Windows 安装包` + Boundary Test |
+| 回归脚本 | `viewer/scripts/boundary-test.cjs`（打断/转移边界）、`viewer/scripts/memtest.cjs`（100 次切换纹理平台期） |
+| 安全 | 路径穿越白名单、zip slip 双向拦截、自由文本净化（零宽/BiDi）、密钥 `0600` 仅主进程持有 |
+
+---
+
+## 全景流程
+
+```mermaid
+graph LR
+    subgraph 素材生产线
+        A["① 真实照片<br/>图库分组/设定图"] --> B["② AI 重绘<br/>绿幕设定图"]
+        B --> C["③ 动画生成<br/>Seedance 视频"]
+        C --> D["④ 本地抽帧<br/>canvas seek"]
+        D --> E["⑤ 抠像<br/>边缘连通域"]
+        E --> F["⑥ 拼精灵表<br/>横排 ≤16384px"]
+        F --> G["⑦ 装配宠物包<br/>pet.json v3 + sheet"]
+    end
+    G --> H[("~/.petpet/pets/&lt;id&gt;/")]
+    H --> I
+
+    subgraph 桌面客户端
+        I["⑧ 加载宠物包<br/>多宠切换"] --> J["⑨ 动作播放<br/>权重 + 转移链"]
+        J --> K["⑩ 交互<br/>拖拽/缩放/穿透"]
+    end
+
+    K --> L{"用户事件"}
+    L -->|点头部| M["摸头 心情 +5<br/>日上限 15"]
+    L -->|点身体| N["提示喂食入口<br/>不加数值"]
+    L -->|提醒「已完成」| O["打卡 饱腹 +20<br/>当天首次 心情 +10"]
+    L -->|漏点 1 分钟| P["心情/饱腹 −30<br/>保底 0"]
+    M --> Q["数值状态机<br/>state/&lt;petId&gt;.json"]
+    O --> Q
+    P --> Q
+    Q --> R["状态胶囊<br/>右上角常驻"]
+    Q --> S["情绪表现<br/>瘫倒/跳跃/乌云/爱心"]
+    R --> T["专注模式<br/>番茄钟 → 唤醒"]
+```
+
+**运行时调用关系**（谁调谁）：
+
+```mermaid
+sequenceDiagram
+    participant U as 用户
+    participant P as 桌宠窗口(渲染层)
+    participant M as 主进程
+    participant C as 状态胶囊窗
+    U->>P: 点身体 / 点头部
+    P->>M: stats:patch(petId, delta)
+    M-->>P: ok + state + applied/capped
+    M-->>C: capsule:refresh
+    U->>P: 提醒里点「已完成」
+    P->>M: reminder:ack + stats:patch(checkin)
+    M-->>C: capsule:refresh
+    U->>M: 托盘/右键「⏳ 专注模式」
+    M->>M: 写 focus.json(endAt)
+    M-->>P: focus:state(true)
+    M-->>C: 胶囊显示 FOCUS mm:ss
+    M-->>P: 归零 → pet:action(wiggle) + pet:bubble
+```
+
+---
+
+## 快速开始
+
+### 路径 A：面板一键（推荐，需要自备火山引擎密钥）
 
 ```bash
-# 1. 安装依赖（numpy/Pillow/rembg/scipy，见 requirements.txt）
-pip install -r requirements.txt
+cd viewer
+npm install
+npm start
+```
 
-# 2. 按顺序跑（以 12 帧为例）
+启动后：托盘/右键 →「🖼 参考图库」→ 建分组导入照片 →「🎨 重绘」出绿幕设定图 →「🎬 生成动画」出动作视频 →「📦 装配当前分组」→ 桌面立刻换成你的宠物。
+
+> 不配置密钥则**完全不联网**，手工素材同样可以装配。
+
+### 路径 B：命令行管线（不联网，Python）
+
+```bash
+pip install -r requirements.txt
 python pipeline/select_frames.py --input <抽帧目录> --output selected/ --frames 12
 python pipeline/remove_bg.py     --input selected/ --output cutout/
 python pipeline/clean_cutout.py  --input cutout/   --output clean/
 python pipeline/make_sheet.py    --input clean/    --output . --name mypet.png
-
-# 3. 得到精灵表后，按 08-接口协议 配置 pet.json，用校验器检查
-python pipeline/validate_pet.py mypet/            # 校验宠物包（缺字段/纹理超限会报错）
-
-# 4.（可选）从宠物画像生成提示词：
-#    python pipeline/validate_pet.py --profile pet-profile.json   # 先校验画像+算派生比例
-#    python pipeline/gen_prompt.py --profile pet-profile.derived.json --action stretch
+python pipeline/validate_pet.py  mypet/            # 打包前必跑
 ```
 
-**验证环境**（可选）：
-
-```bash
-python tests/smoke_test.py   # 管线冒烟测试（造数据→选帧→清理→拼表→超限拦截）
-pytest tests/                # 单元测试（21 个：管线边界 + 校验器 + 提示词生成）
-```
-
-> 💰 **预算提示**：每个动作的 AI 视频生成约 45-130 积分（即梦平台，2.0/2.5 模型），完整 8 动作是数百积分量级的真实付费成本，动手前先评估。
->
-> 🎨 **可选：面板一键重绘 + 动画**：参考图库面板的「重绘」按钮把分组照片重绘成风格化设定图，「🎬 生成动画」用 Seedance 出动作视频并在本地抽帧拼成精灵表（不需要 ffmpeg/Python）。均需自备火山引擎密钥、按张/按条计费（见 docs/02 §5.1/§5.2）。**不配置就完全不联网**。
->
-> 🐕 **样本声明**：完整流程已在**两个品种**上验证——棕白边牧「红苕」（完整 8 动作闭环）与金毛×德牧混血「包包」（设定图锚点闭环，素材见 examples/baobao/）。换其他品种/物种时提示词与素材仍需按 02 重新调优，管线脚本本身通用。
-
-**运行客户端**（viewer/，macOS 实测）：
-
-```bash
-cd viewer
-npm install          # 安装 Electron + PixiJS（首次约 1-2 分钟）
-npm run dev          # 开发模式：加载 ~/.petpet/pets/<宠物名>/ 下的宠物包
-npm run build        # 构建渲染层（dist/）
-npm start            # 构建后直接启动
-```
-
-宠物包结构见 08-接口协议。**想立刻看到效果**：`examples/redshao-demo/` 是一个可直接运行的**最小示例宠物包**（抱熊待机 + 睡觉 + 伸懒腰三个动作，v3 契约含 `sleep→stretch` 行为转移链，压缩至 512px，~4MB）——复制到用户数据目录即可：
+### 路径 C：立刻看到效果（不开账号）
 
 ```bash
 # macOS
-mkdir -p ~/.petpet/pets && cp -r examples/redshao-demo ~/.petpet/pets/redshao-demo
-# Windows
-# 复制 examples/redshao-demo 到 C:\Users\<用户名>\.petpet\pets\redshao-demo
+mkdir -p ~/.petpet/pets && cp -r examples/dev-pet ~/.petpet/pets/dev-pet
+# Windows：把 examples\dev-pet 复制到 C:\Users\<用户名>\.petpet\pets\dev-pet
 ```
 
-启动后即可看到红苕在桌面上抱熊待机、睡觉。完整 8 动作（嗅闻/撒娇/奔跑/露肚/拉粑粑/伸懒腰）需按管线自生成——见 02 与 05。
+`examples/dev-pet` 是 **8 动作自测包**（0.5MB、256px、全透明底），专门用来验证交互/数值/提醒/专注——**不是正式美术素材**。
 
-> 📦 **不想手动复制？** 启动 PetPet 后，托盘菜单 →「📦 导入宠物包」→ 选择宠物包目录或 `.petpack`/`.zip` 压缩包，自动校验后装入（2026-08-10 新增；功能来源：宠物主人安装素材包困难的反馈，详见 08-接口协议 §1.1）。
+### 跑测试
 
----
-
-## 快速上手（三条路径）
-
-| 你想做什么 | 看什么 |
-|-----------|--------|
-| **给自己的宠物做桌宠** | 01（数据模型）→ 02（提示词）→ 05（素材管线）→ 03（需求梳理） |
-| **了解完整设计思路** | 00（设计缘起）→ 04（架构）→ 06（参数） |
-| **避坑** | 07（踩坑实录）——每条坑都是一条铁律 |
-| **定制/扩展** | 08（接口协议）→ 09（双端适配） |
-
----
-
-## 全景流程（一张图看懂整条链）
-
-```mermaid
-graph LR
-    A[① 特征收集<br/>画像层 16 字段<br/>宠物特征收集表] --> B[② 提示词<br/>五要素模板<br/>见 02]
-    B --> C[③ AI 生成<br/>即梦/可灵等<br/>动作视频 5s]
-    C --> D[④ 抽帧<br/>ffmpeg fps=4<br/>20 帧]
-    D --> E[⑤ 选帧<br/>select_frames.py<br/>12 帧]
-    E --> F[⑥ 抠图<br/>remove_bg.py<br/>rembg 语义分割]
-    F --> G[⑦ 清理<br/>clean_cutout.py<br/>只删微小噪点]
-    G --> H[⑧ 拼表<br/>make_sheet.py<br/>精灵表]
-    H --> I[⑨ 部署<br/>宠物包目录<br/>pet.json + 精灵表]
-    I --> J[⑩ 桌宠<br/>Electron + PixiJS]
-    A -.->|运行时事件| J
+```bash
+cd viewer && npm test          # vitest 299 例
+python -m pytest tests/        # 管线单测
+python pipeline/check_refs.py  # 文档矩阵引用完整性
 ```
-
-- ①②是**一次性**（宠物特征采集 + 设定图核实）；③-⑧是**每动作一次**（素材管线，脚本在 `pipeline/`）；⑨⑩是**增量**（加动作只改数据不改代码）
-- 想快速上手：`pipeline/` 六个脚本串起来就是 ④-⑧——**⑤校验器（validate_pet.py）** 打包前必跑，**⑥提示词生成（gen_prompt.py）** 从画像直接产出提示词（见 02）；每步工具可替换（见 [05-素材管线](docs/05-素材管线.md)）
 
 ---
 
 ## 仓库结构
 
 ```
-petpet-playbook/
-├── README.md            本文档（全景图 + 导航）/ README.en.md（英文版）
-├── docs/                方法论文档（00-12 共 13 篇 + 宠物包收录 + 审查清单 + 安全与发布检查清单）
-├── pipeline/            可运行脚本（选帧/抠图/清理/拼表/校验/提示词，含 ruff 配置）
-├── schema/              机器可读契约（pet.json v3 + 宠物画像 16 字段）
-├── templates/           填空模板（pet-profile.example.json）
-├── viewer/              客户端参考实现（Electron + PixiJS 源码）
-├── skills/              AI 助手工作指南（petpet/SKILL.md）
-├── tests/               管线测试（冒烟 + pytest 单元测试）
-├── examples/           实例素材（redshao-demo：可运行最小宠物包 v3；redshao：边牧完整闭环；baobao：金毛×德牧混血第二样本）
-├── requirements.txt     Python 依赖（含版本上下界）
-├── pyproject.toml       ruff 配置
-├── LICENSE              MIT（代码）+ 素材版权声明
-├── SECURITY.md          漏洞报告渠道与安全边界
-└── CONTRIBUTING.md      贡献指南（接入审查清单）
+PawPal/
+├── README.md / README.en.md   中文（本文）/ 英文
+├── docs/                      方法论文档 00–16 + 审查清单 + 安全清单 + handoff 交付书
+├── pipeline/                  可运行脚本（选帧/抠图/清理/拼表/校验/提示词/文档检查）
+├── schema/                    机器可读契约（pet.json v3 + 宠物画像 16 字段）
+├── templates/                 填空模板（pet-profile.example.json）
+├── viewer/                    客户端参考实现（Electron + PixiJS + 素材生产面板）
+│   ├── main.js                主进程：窗口/托盘/菜单/提醒/动画任务/装配
+│   ├── companion.cjs          数值门面（stats / prefs / persona 回写）
+│   ├── stats-store.cjs        数值状态机（跨天重置 / 每日上限 / 惩罚 / 原子写）
+│   ├── status-focus.cjs       状态胶囊窗
+│   ├── focus.cjs / focus-time.cjs
+│   ├── capsule.* / focus.*    胶囊与专注设置卡 UI
+│   ├── refs.* / pet-assembler.cjs / animator*   图库 / 装配 / 动画（本轮冻结）
+│   ├── scripts/               boundary-test / memtest / 端到端脚本
+│   └── src/                   桌宠渲染层（PIXI + 命中判定 + 表现层）
+├── examples/                  示例宠物包（dev-pet 自测 / redshao 闭环 / baobao 第二样本 / demo 包）
+├── tests/                     管线 pytest
+├── assets/                    历史展示素材（demo-preview.jpg / demo.gif）
+└── SECURITY.md / CONTRIBUTING.md / LICENSE
 ```
+
+---
+
+## 数据契约（`pet.json` v3）
+
+顶层 12 字段：`version / id / name / style / theme / cellWidth / cellHeight / bubbles / identity / temperament / persona / actions`
+
+| 字段 | 作用 |
+|---|---|
+| `persona` | 人格：`温柔` / `傲娇` / `搞笑`——决定气泡文案池（缺失回退 `bubbles`） |
+| `identity` / `temperament` | V2-A：身份事实 + 气质滑杆（0–1 对象），调制随机行为权重 |
+| `actions` | 每个动作：`file/sprite`、`frames`、`fps`、`weight`、`label`、`diary`、`transitions`、`scale`、`loop`、`pingpong` |
+| 纹理红线 | **`frames × cellWidth ≤ 16384px`**（WebGL 单轴上限，超了整窗黑屏） |
+
+完整契约见 [docs/08-接口协议.md](docs/08-接口协议.md)，能力实现状态见 [docs/14-实现状态矩阵.md](docs/14-实现状态矩阵.md)。
 
 ---
 
 ## 文档导航
 
-```
-docs/
-├── 00-设计缘起.md     为什么做、交互定稿、脑洞清单（含为什么不做）
-├── 01-数据模型.md     16 字段三层模型、比例派生、设定图流程、双端判断
-├── 02-特征与提示词.md  五要素提示词模板、红苕实例、失败教训库
-├── 03-需求梳理.md     定位演进（桌宠→数字宠物生命）+ 9→8 动作推导、素材演进史
-├── 04-架构设计.md     Electron + PixiJS、进程分工、IPC 通道
-├── 05-素材管线.md     视频 → 精灵表五步、工具可替换矩阵、质量闸门
-├── 06-参数详解.md     每个参数的含义与实验数据
-├── 07-踩坑实录.md     9 条真实事故与铁律（黑屏/白毛腿/无热重载…）
-├── 08-接口协议.md     pet.json Schema、动作注册表、可定制点
-├── 09-双端适配.md     macOS 已实测、Windows 风险点与验证方案
-├── 10-架构升级评估.md  客户端运行时架构缺口评估（状态仲裁/事件层/主题包，分 P0-P2）
-├── 11-同类项目借鉴.md  主流桌宠项目实测与借鉴决策（Shimeji/DyberPet/…）
-├── 12-优化路线图.md    三轮审查产出合流：运行时/数据链路/分发生态三批次
-├── 13-验证台账-20260810.md  修复闭环验证记录（5 commit：redshao 回退/zip slip/scheduleTransition/数据优先/schema 同步）
-├── 14-实现状态矩阵.md      能力×Schema/Runtime/Viewer 实现状态唯一事实源（审计先读本表）
-├── 15-Future-Directions.md  后续探索方向（方向感非承诺，不排期）
-├── 宠物包收录.md      用本方法论做出的宠物包登记（只收链接）
-├── 审查清单.md       对抗性 UI/UX 审查方法（发布前陌生人视角走查）
-└── 安全与发布检查清单.md  安全加固与发布链路走查（与审查清单互补）
-```
-
----
-
-## 实例素材（examples/）
-
-**红苕 demo 包**（`examples/redshao-demo/`）——**可直接运行的完整宠物包**（最小版）：
-
-| 内容 | 说明 |
-|------|------|
-| pet.json | 宠物包定义（idle 抱熊 + sleep 睡觉 + stretch 伸懒腰三动作，512px 压缩版） |
-| knead/knead_sheet.webp | 抱熊待机精灵表（12 帧，~1.8MB） |
-| sleep/sleep_sprite.webp | 睡觉精灵表（12 帧，~1.0MB） |
-| stretch/stretch_sprite.webp | 伸懒腰精灵表（12 帧，~1.0MB） |
-
-> 复制到 `~/.petpet/pets/redshao-demo/` 即可运行（用法见上方「想立刻看到效果」）。
-> 这是为了让你**先看到效果再决定要不要投入**——完整 8 动作需按管线自生成。
-
-**红苕**（棕白边牧，`examples/redshao/`）——完整 8 动作闭环的样本：
-
-| 文件 | 内容 |
-|------|------|
-| real-photo-1/2/3.jpg | 真实照片（正面/仰躺/侧躺） |
-| setup-image.png | 皮克斯 3D 设定图（主人核实的锚点） |
-
-**包包**（金毛×德牧混血，`examples/baobao/`）——品种可迁移性的第二样本：
-
-| 文件 | 内容 |
-|------|------|
-| real-photo-face/full/full2.jpg | 真实照片（半身正面/全身卧姿/正面端坐） |
-| setup-image.png | 3D 设定图（主人核实的锚点） |
-
-**开发自测包 `dev-pet`**（`examples/dev-pet/`）——**8 动作齐全的自测 fixture**（0.5MB、256px 小格子、全程透明底）：
-
-- 用途：客户端开发（交互/数值/提醒/专注）与 CI 自测；**不是正式美术素材**
-- 内容：`idle` + `belly` 为真实帧（取自 `dingdang-demo`），`sleep`/`stretch`/`sniff`/`wiggle`/`run`/`poop` 为几何变换派生的占位动画
-- 为什么单独做一个：现有 demo 包只有 2–3 个动作、**没有 `wiggle`**（提醒到点要播的动作），且单表 655px 偏重
-- 重新生成：`python examples/dev-pet/make.py`（可复现），详见 [examples/dev-pet/README.md](examples/dev-pet/README.md)
-
-> 动画素材由 AI 生成（即梦），版权归用户所有；发布时请保留平台 AI 标识要求。
+| 你想做什么 | 看什么 |
+|---|---|
+| 给自己的宠物做桌宠 | [01-数据模型](docs/01-数据模型.md) → [02-提示词](docs/02-特征与提示词.md) → [05-素材管线](docs/05-素材管线.md) |
+| 了解设计与取舍 | [00-设计缘起](docs/00-设计缘起.md) → [04-架构设计](docs/04-架构设计.md) → [10-架构升级评估](docs/10-架构升级评估.md) |
+| 查实现状态 | **[14-实现状态矩阵](docs/14-实现状态矩阵.md)**（唯一事实源）→ [13-验证台账](docs/13-验证台账-20260810.md) |
+| 避坑 | [07-踩坑实录](docs/07-踩坑实录.md)（11 条真实事故与铁律） |
+| 动画链路细节 | [16-桌宠动画链路](docs/16-桌宠动画链路-20261103.md) |
+| 分工与共享契约 | [docs/handoff/README.md](docs/handoff/README.md)（C1–C5 契约、依赖矩阵） |
 
 ---
 
@@ -228,34 +236,32 @@ docs/
 
 1. **宠物即数据包**：换宠物 = 换目录，不动代码
 2. **提示词是特征的翻译**：结构化特征 → 可控生成
-3. **每步工具可替换**：即梦/rembg/PIL 都不是唯一解
-4. **淘气有边界**：视觉淘气可以，真实文件操作不做
-5. **诚实标注状态**：未实测的功能不宣称已支持
+3. **每步工具可替换**：Seedance / rembg / PIL 都不是唯一解
+4. **淘气有边界**：视觉上的淘气可以，真实文件操作不做
+5. **诚实标注状态**：没实测过的功能不宣称已支持
 
 ---
 
 ## Roadmap
 
-> 路线随真实用户验证结果调整（开源项目不画饼：只列方向，不承诺时间）。
+**✅ 已完成**：素材生产线（图库 / 重绘 / 动画 / 装配 / 校验）· 桌面客户端（多宠、动作转移、提醒三件套、日记、人格气泡、命中判定）· 状态数值与情绪表现 · 状态胶囊 + 专注模式 · CI/Release 自动化 · 299 单测
 
-**✅ 已完成**：素材管线（抽帧/抠图/精灵表/校验）；查看器参考实现（8 动作 + 行为转移链 + 提醒系统 + 日记 + 主题换肤）；方法论 13 篇文档；CI/Release 自动化；双语言 README；示例宠物包（redshao 完整闭环 / redshao-demo 最小可玩）
+**🔨 进行中**：Windows 真机手测闭环 · 手势与交互细化 · 文档与截图补齐
 
-**🔨 进行中**：真实用户验证（Windows 安装闭环、熟人口碑反馈）——验证结果决定下一步方向
-
-**🔭 规划中**（按验证结果调整）：宠物身份与气质模型（行为倾向调制）；记忆与关系系统（事件 → 习惯 → 关系）；展示与分享能力
+**🔭 规划中**：记忆与关系系统（事件 → 习惯）· 展示与分享 · 主题包
 
 ---
 
 ## 贡献
 
-- 新宠物实例：欢迎提交你的宠物素材包（按 08 接口协议）
-- 新踩坑：欢迎在 07 追加你的事故记录
-- 脑洞认领：00 的脑洞清单标注了可行性分析，欢迎实现
+- 新宠物实例：按 [08-接口协议](docs/08-接口协议.md) 提交宠物包
+- 新踩坑：在 [07-踩坑实录](docs/07-踩坑实录.md) 追加
+- 代码：`npm test` 与 `python pipeline/check_refs.py` 必须绿；提交信息不含具体 AI 工具名
 
 ---
 
 ## License
 
-- **代码**（`pipeline/` 脚本等）：[MIT](LICENSE)
-- **素材**（`examples/` 中的宠物照片、设定图、演示 GIF）：版权归宠物主人所有，仅作示例展示，请勿商用或二次分发
-- **动画素材**由即梦 AI 生成，开源发布时保留 AI 平台标识（详见 [02-特征与提示词.md](docs/02-特征与提示词.md)）
+- **代码**（`pipeline/`、`viewer/`）：[MIT](LICENSE)
+- **素材**（`examples/`、`assets/`）：版权归宠物主人所有，仅作示例，请勿商用或二次分发
+- **AI 生成素材**：发布时请保留平台标识要求（详见 [02-特征与提示词](docs/02-特征与提示词.md)）
