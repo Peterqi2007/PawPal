@@ -248,4 +248,22 @@ jobs:
             artifacts/windows/*.exe
             artifacts/windows/*.blockmap
           generate_release_notes: true
-          draft: true
+          # 正式发布（不留在草稿态）；tag 推上去后由 CI 自动生成并公开
+          draft: false
+          prerelease: false
+          append_body: true
+          body: |
+            ## 安装说明
+
+            - **macOS**：下载 `.dmg` 打开拖进 Applications。安装包**未签名**，首次打开若被拦截，
+              请到「系统设置 → 隐私与安全性」点「仍要打开」，或右键 App →「打开」。
+            - **Windows**：下载 `.exe` 安装。安装包**未签名**，SmartScreen 提示时点「更多信息 → 仍要运行」。
+            - 宠物素材与数值数据都在 `~/.petpet/`（Windows 为 `%USERPROFILE%\.petpet`），升级不会清空。
+
+            ## 使用
+
+            装好后托盘/桌宠右键 →「📘 使用说明」，里面有**从照片到会动的桌宠**的完整四步：
+            重绘形象 → 生成动作视频 → 抽帧拼表（可反复重抽，不花钱）→ 装配应用。
+
+            > AI 重绘与动画生成需要自备火山引擎密钥（本地 `~/.petpet/ark.json`，权限 0600，
+            > 只在主进程使用，渲染层拿不到明文）。不配置密钥则完全不联网，手工素材照常可用。
