@@ -45,6 +45,7 @@ contextBridge.exposeInMainWorld('petAPI', {
   onVisibility: (cb) => ipcRenderer.on('pet:visibility', (_e, visible) => cb(visible)),  // P2-5: 隐藏时暂停动画
   // 打开参考图库（主进程已有 refs:open 处理器，这里补一个渲染层入口，便于脚本/未来按钮调用）
   openRefs: () => ipcRenderer.send('refs:open'),
+  openGuide: () => ipcRenderer.send('guide:open'),
   // 状态胶囊显隐（渲染层/自动化脚本可用；托盘与右键菜单是同一个开关）
   toggleCapsule: () => ipcRenderer.send('capsule:toggle'),
   showCapsule: () => ipcRenderer.send('capsule:show'),

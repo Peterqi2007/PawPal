@@ -259,6 +259,7 @@ function rebuildTrayMenu() {
     { type: 'separator' },
     // B-3 专注模式：打开设置卡（与右键菜单、A 的 focus:request 同一入口）
     { label: '⏳ 专注模式', click: () => focusMode && focusMode.open() },
+    { label: '📘 使用说明', click: () => openGuideWindow() },
     // B-2 胶囊被 X 收起来后，从这里叫回来
     {
       label: '💊 状态胶囊',
@@ -360,6 +361,7 @@ ipcMain.handle('menu:showContext', (_evt, x, y) => {
     { type: 'separator' },
     { label: '⏰ 提醒我', click: () => openReminderWithFocus() },
     { label: '⏳ 专注模式', click: () => focusMode && focusMode.open() },
+    { label: '📘 使用说明', click: () => openGuideWindow() },
     { label: `📖 ${petName}日记`, click: () => openDiaryWindow(currentPetId || '') },
     { label: '🖼 参考图库', click: () => openRefsWindow() },
     { label: '✏️ 编辑档案', click: () => openRefsWindow() }, // Part A：复用图库窗（改名字/照片/人格）
@@ -790,6 +792,7 @@ ipcMain.on('diary:close', () => {
 // 分组（v2）：一个用户可有多只宠物，参考图按分组归档；**角色规则收敛到组内**——
 //   组内首张导入即该宠物的设定图，设定图组内唯一，顶替时同组旧的自动降级为姿势参考
 let refsWindow = null
+let guideWindow = null // 使用说明（同一时刻只开一扇）
 
 // 统一返回界面所需状态：分组列表 + 当前分组 + 该组图片 + 统计
 function refsState(groupId) {
@@ -1435,6 +1438,47 @@ ipcMain.handle('pet:installed', () => {
   } catch {
     return []
   }
+})
+
+// 使用说明：把「重绘 → 生成视频 → 重抽帧 → 装配」这条链路讲清楚
+function openGuideWindow() {
+  if (guideWindow && !guideWindow.isDestroyed()) {
+    guideWindow.show()
+    guideWindow.focus()
+    return
+  }
+  const W = 560
+  const H = 640
+  const display = mainWindow ? screen.getDisplayNearestPoint({ x: mainWindow.getBounds().x, y: mainWindow.getBounds().y }) : screen.getPrimaryDisplay()
+  const work = display.workArea
+  guideWindow = new BrowserWindow({
+    width: W,
+    height: H,
+    x: Math.round(work.x + (work.width - W) / 2),
+    y: Math.round(work.y + Math.max(0, (work.height - H) / 2)),
+    title: 'PawPal 使用说明',
+    frame: false,
+    resizable: true,
+    movable: true,
+    minimizable: false,
+    maximizable: false,
+    skipTaskbar: false,
+    hasShadow: true,
+    backgroundColor: '#fbfbfc',
+    webPreferences: {
+      preload: path.join(__dirname, 'guide-preload.cjs'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true
+    }
+  })
+  guideWindow.loadFile(path.join(__dirname, 'guide.html'))
+  guideWindow.on('closed', () => { guideWindow = null })
+}
+
+ipcMain.on('guide:open', () => openGuideWindow())
+ipcMain.on('guide:close', () => {
+  if (guideWindow && !guideWindow.isDestroyed()) guideWindow.close()
 })
 
 function openRefsWindow() {
