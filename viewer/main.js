@@ -147,9 +147,6 @@ function saveUiState(patch) {
   }
 }
 
-const { registerStatusFocus } = require('./status-focus.cjs') // Part B：状态胶囊 + 专注模式
-let statusFocus = null // 延后赋值：注册时它还不存在，用闭包解引用
-
 // ==== SECTION: A / companion-pet ====
 // Part A：数值（stats:get/patch）、偏好（prefs:get/set）、音效日志（audio:report）
 // 契约见 docs/handoff/README.md §5 C2/C3；数据落在 ~/.petpet/state/<petId>.json
@@ -159,7 +156,7 @@ const petCompanion = companion.registerPetCompanion({
   readUiState: loadUiState,
   writeUiState: saveUiState,
   // 数值一变就让胶囊重画（胶囊自己不算分，只显示主进程给的快照）
-  onStatsChange: () => { if (statusFocus) statusFocus.refreshCapsule() }
+  onStatsChange: () => { if (statusFocus) statusFocus.refresh() }
 })
 // ==== SECTION: A / end ====
 
@@ -209,7 +206,7 @@ function createWindow() {
   // 窗口移动/关闭时保存位置
   // 渲染层就绪后补发专注态（启动 restore 早于页面 ready，直接发的会丢）
   mainWindow.webContents.on('did-finish-load', () => {
-    if (statusFocus) statusFocus.announceFocusState()
+    if (focusMode) focusMode.pushState()
   })
 
   mainWindow.on('moved', () => {
@@ -260,21 +257,8 @@ function rebuildTrayMenu() {
     { label: '🔎 缩小', click: () => send('view:zoom', 1 / 1.15) },
     { label: '↺ 重置大小', click: () => send('view:reset') },
     { type: 'separator' },
-    {
-      label: statusFocus && statusFocus.isFocusing()
-        ? `⏹ 结束专注（剩 ${statusFocus.tickPayload().text}）`
-        : '🕐 专注模式…',
-      click: () => {
-        if (statusFocus && statusFocus.isFocusing()) statusFocus.stopFocus()
-        else if (statusFocus) statusFocus.openFocusCard()
-      }
-    },
-    {
-      label: '💊 状态胶囊',
-      type: 'checkbox',
-      checked: !statusFocus || statusFocus.isCapsuleVisible(),
-      click: (item) => { if (statusFocus) statusFocus.toggleCapsule(item.checked) }
-    }
+    // B-3 专注模式：打开设置卡（与右键菜单、A 的 focus:request 同一入口）
+    { label: '⏳ 专注模式', click: () => focusMode && focusMode.open() }
   ]
 
   // P0-1：多宠切换（列出 PETS_ROOT 下所有宠物包）
@@ -362,15 +346,7 @@ ipcMain.handle('menu:showContext', (_evt, x, y) => {
     { label: petName, enabled: false },
     { type: 'separator' },
     { label: '⏰ 提醒我', click: () => openReminderWithFocus() },
-    {
-      label: statusFocus && statusFocus.isFocusing()
-        ? `⏹ 结束专注（剩 ${statusFocus.tickPayload().text}）`
-        : '🕐 专注模式…',
-      click: () => {
-        if (statusFocus && statusFocus.isFocusing()) statusFocus.stopFocus()
-        else if (statusFocus) statusFocus.openFocusCard()
-      }
-    },
+    { label: '⏳ 专注模式', click: () => focusMode && focusMode.open() },
     { label: `📖 ${petName}日记`, click: () => openDiaryWindow(currentPetId || '') },
     { label: '🖼 参考图库', click: () => openRefsWindow() },
     { label: '✏️ 编辑档案', click: () => openRefsWindow() }, // Part A：复用图库窗（改名字/照片/人格）
@@ -487,7 +463,7 @@ ipcMain.on('pet:loaded', (_evt, petId) => {
     currentPetActions = null
   }
   console.log('[PetPet][诊断] pet:loaded →', petId, '动作数:', currentPetActions?Object.keys(currentPetActions).length:0)
-  if (statusFocus) statusFocus.refreshCapsule()
+  if (statusFocus) statusFocus.refresh()
   rebuildTrayMenu()
 })
 
@@ -1531,7 +1507,7 @@ function missReminder(id) {
     console.log('[PetPet][数值] 提醒 #' + id + ' 未被点击 → 心情/饱腹各 -30，现在', JSON.stringify({
       mood: r.state.mood, satiety: r.state.satiety
     }))
-    if (statusFocus) statusFocus.refreshCapsule()
+    if (statusFocus) statusFocus.refresh()
     send('reminder:missed', { id, state: { mood: r.state.mood, satiety: r.state.satiety } })
   } catch (e) {
     console.error('[PetPet][数值] 漏点扣分异常:', e && e.message)
@@ -1588,36 +1564,30 @@ const openReminderArg = process.argv.includes('--open-reminder')
 const openRefsArg = process.argv.includes('--open-refs')
 
 // ==== SECTION: B / status-focus ====
-// B-1 数值系统：饱腹 / 心情 / 打卡。状态落 ~/.petpet/state/<petId>.json（契约 C2）。
-// 规则与原子写由 viewer/stats-store.cjs 提供，IPC 注册在 A 段（companion.cjs 的
-// registerPetCompanion）——同一 channel 注册两次 Electron 会直接抛错，这里不再重复 handle。
-// B-2/B-3（胶囊窗 + 专注模式）在下面注册。
-statusFocus = registerStatusFocus({
-  app,
-  screen,
-  BrowserWindow,
+// B-1 数值系统：状态落 ~/.petpet/state/<petId>.json（契约 C2）。规则与原子写由
+// viewer/stats-store.cjs 提供，IPC 注册在 A 段（companion.cjs 的 registerPetCompanion）——
+// 同一 channel 注册两次 Electron 会直接抛错，这里不再重复 handle。
+//
+// B-2/B-3 由 B 组交付（合自 PR #9）：focus.cjs 管专注，status-focus.cjs 管胶囊。
+const { registerStatusFocus } = require('./status-focus.cjs')
+const { registerFocus } = require('./focus.cjs')
+const focusMode = registerFocus({
   ipcMain,
-  getPet: () => (currentPetId ? { id: currentPetId, name: currentPetName || '宠物' } : null),
-  // 胶囊头像 = 当前宠物 idle 精灵表的首帧（不需要新素材）
-  getAvatar: () => {
-    if (!currentPetId) return null
-    try {
-      const json = JSON.parse(fs.readFileSync(path.join(PETS_ROOT, currentPetId, 'pet.json'), 'utf-8'))
-      const act = (json.actions && (json.actions.idle || json.actions[Object.keys(json.actions)[0]])) || null
-      const file = act && (act.file || act.sprite)
-      if (!file) return null
-      return { url: `petpet://${currentPetId}/${file}`, frames: Math.max(1, Number(act.frames) || 1) }
-    } catch (e) {
-      return null
-    }
-  },
-  getStats: () => {
-    if (!currentPetId) return null
-    const r = petCompanion.statsStore.read(currentPetId)
-    return r && r.ok ? r.state : null
-  },
-  notifyPet: (channel, payload) => send(channel, payload),
-  onStateChange: () => rebuildTrayMenu()
+  send,
+  onChange: () => statusFocus.refresh()
+})
+const statusFocus = registerStatusFocus({
+  app,
+  ipcMain,
+  getPet: () => ({ id: currentPetId, name: currentPetName, actions: currentPetActions }),
+  readStats: (petId) => petCompanion.statsStore.read(petId),
+  getFocus: () => focusMode.getState()
+})
+// 换宠物后推一次刷新（ipcMain.on 可叠加监听，不与 pet:loaded 原有逻辑冲突）
+ipcMain.on('pet:loaded', () => {
+  setTimeout(() => statusFocus.refresh(), 100)
+  // 渲染层此刻才挂上 focus:state 监听，补发一次（重启恢复的专注也能变暗）
+  setTimeout(() => focusMode.pushState(), 120)
 })
 // ==== SECTION: B / end ====
 
@@ -1626,13 +1596,15 @@ app.whenReady().then(() => {
   registerPetpetProtocol()  // N-3：自定义协议（CSP 已放行 petpet:）
   registerMediaProtocol()   // 动画素材协议（petmedia:）
   createWindow()
-  // B-2/B-3：右上角状态胶囊常驻；README §B3「重启恢复」——endAt 未到就继续计时
-  try {
-    statusFocus.createCapsule()
-    statusFocus.restore()
-  } catch (e) {
-    console.error('[PetPet][专注] 初始化失败:', e && e.message)
+  // B-2：右上角状态胶囊（收起 56px，悬停展开）
+  // 测试脚本（scripts/boundary-test.cjs、memtest.cjs）把 getAllWindows()[0] 当主窗口用，
+  // 多开一个窗口会让它们抓错窗口（pet:switch / reminder:fire 发丢）；且内存测试也不该多算一扇窗。
+  if (!process.env.PETPET_MEMTEST) {
+    statusFocus.create()
   }
+  // B-3：续上重启前未结束的专注（endAt 已过则清掉 focus.json，不会凭空计时）
+  focusMode.resume()
+  if (!process.env.PETPET_MEMTEST) statusFocus.refresh()
   // macOS Dock 图标：示例宠物头像（内嵌 base64，打包后有效；换宠物时替换此图标）
   if (process.platform === 'darwin' && app.dock) {
     try {

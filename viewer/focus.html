@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="zh-CN">
   <head>
-    <meta charset="UTF-8" />
+    <meta charset="utf-8" />
     <meta
       http-equiv="Content-Security-Policy"
       content="default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'"
@@ -10,41 +10,33 @@
     <link rel="stylesheet" href="focus.css" />
   </head>
   <body>
-    <main class="card">
+    <div class="card">
       <header class="head">
-        <h1>专注一下</h1>
-        <button class="close" id="close" type="button" aria-label="关闭">✕</button>
+        <span class="title">专注模式</span>
+        <button class="close" id="cancel" title="取消（Esc）">×</button>
       </header>
 
-      <p class="hint" id="hint">桌宠会趴下变暗，陪你一起撑过这段时间。</p>
+      <div class="body">
+        <label class="field" for="minutes">
+          <input id="minutes" type="text" inputmode="numeric" maxlength="3" value="25" autocomplete="off" />
+          <span class="unit">分钟</span>
+        </label>
 
-      <div class="input-row">
-        <input
-          id="minutes"
-          class="minutes"
-          type="text"
-          inputmode="numeric"
-          value="25"
-          autocomplete="off"
-          aria-label="专注分钟数"
-        />
-        <span class="unit">分钟</span>
+        <div class="presets" id="presets">
+          <button type="button" data-min="15">15</button>
+          <button type="button" data-min="25" class="on">25</button>
+          <button type="button" data-min="45">45</button>
+          <button type="button" data-min="60">60</button>
+        </div>
+
+        <p class="hint" id="hint">专注期间桌宠会安静下来，到点会提醒你休息</p>
       </div>
 
-      <div class="presets" id="presets">
-        <button type="button" data-min="15">15</button>
-        <button type="button" data-min="25">25</button>
-        <button type="button" data-min="45">45</button>
-        <button type="button" data-min="60">60</button>
-      </div>
-
-      <p class="error" id="error" role="alert"></p>
-
-      <footer class="footer">
-        <button class="ghost" id="cancel" type="button">取消</button>
-        <button class="primary" id="start" type="button">开始专注</button>
+      <footer class="foot">
+        <button class="primary" id="start">开始专注</button>
       </footer>
-    </main>
+    </div>
+
     <script src="focus.js"></script>
   </body>
 </html>

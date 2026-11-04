@@ -1,87 +1,82 @@
-// 专注设置卡：1–180 分钟的整数校验 + 预设 + 开始/取消
-// 校验规则与主进程共用同一份口径（focus-session.cjs），这里只做一次轻量镜像，
-// 真正的拦截仍在主进程 focus:start（渲染层校验只为即时反馈，不作为安全边界）。
+// B-3 专注设置卡渲染层：只管输入体验，分钟数的最终校验在主进程 focus.cjs（这里同步一份只为即时反馈）
 'use strict'
 
-const MIN = 1
-const MAX = 180
+const MIN_MINUTES = 1
+const MAX_MINUTES = 180
 
-const $ = (id) => document.getElementById(id)
-const input = $('minutes')
-const startBtn = $('start')
-const error = $('error')
-const hint = $('hint')
-
-/** @returns {{ok:true, minutes:number}|{ok:false, error:string}} */
-function parseMinutes(raw) {
-  const text = String(raw == null ? '' : raw).trim().replace(/\s*(分钟|分|min)$/i, '')
-  if (text === '') return { ok: false, error: '请填一个分钟数（1–180）' }
-  if (!/^\d+$/.test(text)) return { ok: false, error: '只能填整数分钟（1–180）' }
-  const n = Number(text)
-  if (n < MIN) return { ok: false, error: `至少 ${MIN} 分钟` }
-  if (n > MAX) return { ok: false, error: `最多 ${MAX} 分钟` }
-  return { ok: true, minutes: n }
+const el = {
+  input: document.getElementById('minutes'),
+  hint: document.getElementById('hint'),
+  start: document.getElementById('start'),
+  cancel: document.getElementById('cancel'),
+  presets: Array.from(document.querySelectorAll('#presets button'))
 }
 
-function validate() {
-  const r = parseMinutes(input.value)
-  const bad = !r.ok
-  error.textContent = bad ? r.error : ''
-  startBtn.disabled = bad
-  // 预设高亮
-  for (const btn of $('presets').querySelectorAll('button')) {
-    btn.classList.toggle('active', Number(btn.dataset.min) === r.minutes)
+function readMinutes() {
+  const s = el.input.value.trim()
+  if (!/^\d{1,3}$/.test(s)) return null
+  const n = Number(s)
+  return n >= MIN_MINUTES && n <= MAX_MINUTES ? n : null
+}
+
+function sync() {
+  const minutes = readMinutes()
+  const ok = minutes !== null
+  el.input.classList.toggle('bad', !ok)
+  el.start.disabled = !ok
+  el.hint.classList.toggle('bad', !ok)
+  el.hint.textContent = ok ? '专注期间桌宠会安静下来，到点会提醒你休息' : '请输入 1–180 的整数分钟'
+  for (const btn of el.presets) {
+    btn.classList.toggle('on', ok && Number(btn.dataset.min) === minutes)
   }
-  return r
 }
 
-function start() {
-  const r = validate()
-  if (!r.ok) return
-  startBtn.disabled = true
-  window.capsuleAPI.focusStart(r.minutes).then((res) => {
-    if (!res || !res.ok) {
-      error.textContent = (res && res.error) || '开始失败，请重试'
-      startBtn.disabled = false
+async function submit() {
+  const minutes = readMinutes()
+  if (minutes === null) {
+    el.input.focus()
+    return
+  }
+  el.hint.classList.remove('bad')
+  el.hint.textContent = '开始中…'
+  el.start.disabled = true
+  try {
+    const r = await window.focusAPI.start(minutes)
+    // 成功时主进程会关掉本窗口；失败（理论上被主进程拦下）把错误显示出来
+    if (!r || !r.ok) {
+      el.hint.classList.add('bad')
+      el.hint.textContent = '开始失败，请检查分钟数后重试'
     }
-    // 成功时主进程会关掉本窗
+  } catch (e) {
+    console.error('[focus] 开始专注失败', e)
+    el.hint.classList.add('bad')
+    el.hint.textContent = '开始失败，请重试'
+  }
+  sync()
+}
+
+el.input.addEventListener('input', sync)
+el.input.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault()
+    submit()
+  } else if (e.key === 'Escape') {
+    e.preventDefault()
+    window.focusAPI.cancel()
+  }
+})
+
+for (const btn of el.presets) {
+  btn.addEventListener('click', () => {
+    el.input.value = btn.dataset.min || ''
+    sync()
+    el.input.focus()
   })
 }
 
-input.addEventListener('input', () => {
-  // 只留数字，避免粘贴出乱码
-  const cleaned = input.value.replace(/[^\d]/g, '').slice(0, 3)
-  if (cleaned !== input.value) input.value = cleaned
-  validate()
-})
-input.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') start()
-  if (e.key === 'Escape') window.capsuleAPI.closeCard()
-})
+el.start.addEventListener('click', submit)
+el.cancel.addEventListener('click', () => window.focusAPI.cancel())
 
-$('presets').addEventListener('click', (e) => {
-  const btn = e.target.closest('button[data-min]')
-  if (!btn) return
-  input.value = btn.dataset.min
-  validate()
-  input.focus()
-})
-
-startBtn.addEventListener('click', start)
-$('cancel').addEventListener('click', () => window.capsuleAPI.closeCard())
-$('close').addEventListener('click', () => window.capsuleAPI.closeCard())
-
-// 打开时：如果有正在进行的专注，提示剩余时间并允许直接结束
-window.capsuleAPI.focusDefaults().then((cfg) => {
-  if (cfg && cfg.minutes) input.value = String(cfg.minutes)
-  validate()
-  input.select()
-})
-window.capsuleAPI.focusGet().then((cur) => {
-  if (cur && cur.focusing) {
-    hint.textContent = `正在专注：还剩 ${cur.text}。重新开始会覆盖当前计时。`
-  }
-})
-
-validate()
-input.focus()
+el.input.focus()
+el.input.select()
+sync()

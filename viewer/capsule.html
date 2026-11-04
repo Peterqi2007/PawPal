@@ -1,64 +1,54 @@
 <!doctype html>
 <html lang="zh-CN">
   <head>
-    <meta charset="UTF-8" />
+    <meta charset="utf-8" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; img-src 'self' data: petpet:; style-src 'self' 'unsafe-inline'; script-src 'self'"
+      content="default-src 'none'; img-src petpet: data:; style-src 'self' 'unsafe-inline'; script-src 'self'"
     />
-    <title>PetPet 状态</title>
+    <title>状态胶囊</title>
     <link rel="stylesheet" href="capsule.css" />
   </head>
   <body>
-    <!-- 收起态：56px 状态条；悬停展开下方面板（窗口高度固定，靠透明度切换） -->
-    <div id="capsule" class="capsule" role="status" aria-live="polite">
-      <div class="bar" id="bar">
-        <div class="avatar" id="avatar" aria-hidden="true">
-          <span class="avatar-fallback">🐾</span>
+    <div class="capsule" id="capsule">
+      <header class="head">
+        <div class="avatar" id="avatar" aria-hidden="true"></div>
+        <div class="meta">
+          <div class="name" id="name">宠物</div>
+          <div class="hint" id="hint">正在读取状态…</div>
         </div>
-        <div class="ident">
-          <div class="name" id="pet-name">还没有宠物</div>
-          <div class="sub" id="pet-sub">右键宠物 → 切换宠物</div>
-        </div>
-        <div class="dot" id="status-dot" title="状态"></div>
-      </div>
+        <span class="dot" id="dot"></span>
+      </header>
 
-      <div class="panel" id="panel">
-        <div class="panel-head">
-          <span class="panel-title">今日状态</span>
-          <span class="panel-date" id="panel-date">—</span>
-        </div>
+      <section class="panel" id="panel">
+        <div class="panel-title">今日状态<span class="date" id="date"></span></div>
 
-        <div class="row">
-          <span class="row-label">心情</span>
-          <div class="track"><i class="fill mood" id="mood-fill"></i></div>
-          <span class="row-value" id="mood-value">—</span>
-        </div>
-        <div class="row">
-          <span class="row-label">饱腹</span>
-          <div class="track"><i class="fill satiety" id="satiety-fill"></i></div>
-          <span class="row-value" id="satiety-value">—</span>
+        <div class="stat">
+          <span class="label">饱腹</span>
+          <div class="bar"><i id="barSatiety"></i></div>
+          <span class="val" id="valSatiety">—</span>
         </div>
 
-        <div class="row checkins">
-          <span class="row-label">打卡</span>
-          <div class="dots" id="checkin-dots">
-            <i></i><i></i><i></i>
-          </div>
-          <span class="row-value" id="checkin-value">0/3</span>
+        <div class="stat">
+          <span class="label">心情</span>
+          <div class="bar"><i id="barMood"></i></div>
+          <span class="val" id="valMood">—</span>
         </div>
 
-        <div class="focus-block hidden" id="focus-block">
-          <div class="focus-head">
-            <span class="focus-label" id="focus-text">FOCUS 24:59</span>
-            <button class="link-btn" id="focus-stop" type="button">提前结束</button>
-          </div>
-          <div class="track focus"><i class="fill focus-fill" id="focus-fill"></i></div>
+        <div class="checkin">
+          <span class="label">打卡</span>
+          <span class="dots" id="dots"></span>
+          <span class="checkin-text" id="checkinText">还没打卡</span>
         </div>
 
-        <button class="primary" id="focus-start" type="button">🕐 开始专注</button>
-      </div>
+        <div class="focus-row" id="focusRow">
+          <span class="label">专注</span>
+          <span class="focus-time" id="focusTime">00:00</span>
+          <button class="end" id="endFocus" type="button">提前结束</button>
+        </div>
+      </section>
     </div>
+
     <script src="capsule.js"></script>
   </body>
 </html>

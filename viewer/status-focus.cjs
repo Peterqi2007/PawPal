@@ -1,363 +1,202 @@
-// B-2 / B-3：状态胶囊窗 + 专注模式（主进程侧）
+// B-2 状态胶囊的主进程侧：右上角常驻小窗（收起 56px，悬停展开）
 //
-// 职责边界（docs/handoff/B-状态与专注.md）：
-//   - 胶囊窗：右上角独立常驻窗，收起一条 56px 的状态条，悬停展开今日状态
-//   - 专注模式：设置卡 → 计时 → 胶囊显示倒计时 → 结束后唤醒桌宠
-//   - 数值不在这里算：一律读 stats-store（B1）给的快照，胶囊只负责显示
+// 与 A 的分工：
+//   A 的 registerPetCompanion 只管数值落盘与 stats:* IPC；
+//   胶囊这边**只读**（capsule:state → statsStore.read），不写状态、不另存一份，
+//   避免出现两个真源。宠物信息同样从 main.js 现有的 currentPet* 取，不重复解析 pet.json。
 //
-// 与 Part A 的接口（README §5 C5）：
-//   发 `focus:state`(entering:boolean) 给桌宠渲染层 → A 负责"变暗 + 暂停随机行为"
-//   结束唤醒：发 `pet:action`(wiggle) + `pet:bubble`(文案)
+// 鼠标穿透：窗口整体 setIgnoreMouseEvents(true, { forward: true })，
+// 渲染层靠 mousemove 判断指针是否落在胶囊卡片上，落在卡片上才接管鼠标（否则点击穿透到桌面）。
 'use strict'
 
 const path = require('path')
-const fs = require('fs')
+const { BrowserWindow, screen } = require('electron')
 
-const {
-  parseMinutes,
-  endAtFromMinutes,
-  normalizeFocus,
-  remainingMs,
-  formatCountdown
-} = require('./focus-session.cjs')
-const { buildCapsuleModel } = require('./capsule-state.cjs')
+// 窗口尺寸 = 卡片尺寸 + 8px 内边距 ×2。收起时只有 56px 一条，
+// 展开时面板约 160px（专注行显示时约 205px）—— 窗口高度跟着内容变，透明区才不会挡住桌面点击。
+// 展开高度按「专注行也显示」的最坏情况给：否则专注中底部按钮会被 .capsule 的 overflow:hidden 裁掉。
+const CAPSULE_WIDTH = 300
+const COLLAPSED_HEIGHT = 74
+const EXPANDED_HEIGHT = 240
+const EDGE_MARGIN = 12
+// 跨天自愈：数值重置发生在"下一次读写"时（stats-store 的设计），
+// 收起态胶囊不会自己展开，过夜后会一直显示昨天的数字 → 每 60s 主动拉一次。
+const SELFTICK_MS = 60_000
 
-const CAPSULE_W = 300
-const CAPSULE_H = 300 // 固定为"展开且显示专注块"的高度（收起只显示顶部 60px，其余透明）
-                     // 定高避免 setBounds 抖动；多出来的透明区靠鼠标穿透放过下层应用
-const CAPSULE_MARGIN = 12
-const CARD_W = 360
-const CARD_H = 236
-const TICK_MS = 1000
-const REFRESH_MS = 60_000 // 跨天自愈：每分钟重读一次数值，跨过 00:00 后最多 60 秒胶囊就回到当天初始值
-const WAKE_BUBBLE = '休息一下，顺便给我换水吧。'
+// pet.json 里动作图可能是 file 也可能是 sprite（两者等价），取第一个能用的
+function pickSprite(actions) {
+  if (!actions || typeof actions !== 'object') return null
+  const names = ['idle', ...Object.keys(actions)]
+  for (const name of names) {
+    const act = actions[name]
+    if (!act || typeof act !== 'object') continue
+    const rel = act.file || act.sprite
+    if (typeof rel === 'string' && rel.length > 0) return { rel, action: name }
+  }
+  return null
+}
 
-/**
- * @param {object} deps
- * @param {import('electron').App} deps.app
- * @param {import('electron').Screen} deps.screen
- * @param {typeof import('electron').BrowserWindow} deps.BrowserWindow
- * @param {import('electron').IpcMain} deps.ipcMain
- * @param {() => ({id: string, name: string}|null)} deps.getPet        当前宠物
- * @param {() => object|null} deps.getStats                            当前数值快照
- * @param {(channel: string, payload?: any) => void} deps.notifyPet     发给桌宠渲染层
- * @param {() => void} [deps.onStateChange]                            专注态变化时重建菜单
- */
+// petpet://<petId>/<relPath>：与主窗口同一套协议，路径分段编码防止 # ? 之类截断
+function spriteUrl(petId, rel) {
+  const safeRel = rel
+    .split(/[\\/]+/)
+    .filter((s) => s && s !== '.' && s !== '..')
+    .map(encodeURIComponent)
+    .join('/')
+  return `petpet://${encodeURIComponent(petId)}/${safeRel}`
+}
+
 function registerStatusFocus(deps) {
-  const { app, screen, BrowserWindow, ipcMain, getPet, getStats, getAvatar, notifyPet, onStateChange } = deps
-  const focusFile = path.join(app.getPath('home'), '.petpet', 'focus.json')
+  const { app, ipcMain, getPet, readStats, getFocus } = deps
+  let win = null
+  let ignoring = true
+  let selftick = null
 
-  let capsuleWindow = null
-  let cardWindow = null
-  let tickTimer = null
-  /** @type {{endAt:number, minutes:number, startedAt:number}|null} */
-  let session = null
-  let visible = true // 胶囊是否启用（用户可在菜单里关掉）
-  let screenListenerBound = false
-  let refreshTimer = null
+  // 通知渲染层重新拉一次数据（create() 里的自检定时器与对外的 refresh() 共用）
+  function pushRefresh() {
+    if (win && !win.isDestroyed()) win.webContents.send('capsule:refresh')
+  }
 
-  // ---------- 落盘 ----------
-  function writeFocus(next) {
+  function buildPayload() {
+    let pet = null
     try {
-      fs.mkdirSync(path.dirname(focusFile), { recursive: true })
-      const tmp = `${focusFile}.tmp`
-      fs.writeFileSync(tmp, JSON.stringify(next, null, 2), { mode: 0o600 })
-      fs.renameSync(tmp, focusFile)
+      pet = getPet() || null
     } catch (e) {
-      console.error('[PetPet][专注] 写入失败:', e && e.message)
+      pet = null
+    }
+    if (!pet || !pet.id) return { ok: false, reason: 'no-pet' }
+
+    let state = null
+    try {
+      const r = readStats(pet.id)
+      if (r && r.ok) state = r.state
+    } catch (e) {
+      console.error('[capsule] 读取数值失败:', e)
+    }
+
+    const sprite = pickSprite(pet.actions)
+    // 专注状态由 B-3 的 focus.cjs 持有（只读一份，胶囊不重复计时）
+    let focus = { active: false }
+    try {
+      if (typeof getFocus === 'function') focus = getFocus() || focus
+    } catch (e) {
+      console.error('[capsule] 读取专注状态失败:', e)
+    }
+
+    return {
+      ok: true,
+      petId: pet.id,
+      name: typeof pet.name === 'string' && pet.name ? pet.name : '宠物',
+      stats: state
+        ? { satiety: state.satiety, mood: state.mood, checkins: state.checkins }
+        : null,
+      avatar: sprite ? { url: spriteUrl(pet.id, sprite.rel), action: sprite.action } : null,
+      focus
     }
   }
 
-  function clearFocusFile() {
-    try { fs.unlinkSync(focusFile) } catch { /* 不存在就算了 */ }
+  // 贴右上角：用工作区（排除任务栏/Dock），换屏或改分辨率后重新贴一次
+  function place(target) {
+    if (!target || target.isDestroyed()) return
+    const area = screen.getPrimaryDisplay().workArea
+    target.setPosition(
+      Math.round(area.x + area.width - CAPSULE_WIDTH - EDGE_MARGIN),
+      Math.round(area.y + EDGE_MARGIN)
+    )
   }
 
-  // ---------- 胶囊渲染 ----------
-  function model() {
-    return buildCapsuleModel({
-      stats: getStats(),
-      focus: session,
-      pet: getPet(),
-      avatar: typeof getAvatar === 'function' ? getAvatar() : null
-    })
-  }
-
-  function sendToCapsule(channel, payload) {
-    if (capsuleWindow && !capsuleWindow.isDestroyed()) {
-      capsuleWindow.webContents.send(channel, payload)
-    }
-  }
-
-  /** 数值变化 / 换宠物 / 专注态变化后统一刷新胶囊 */
-  function refreshCapsule() {
-    sendToCapsule('capsule:refresh', model())
-  }
-
-  function positionCapsule() {
-    if (!capsuleWindow || capsuleWindow.isDestroyed()) return
-    const { x, y, width } = screen.getPrimaryDisplay().workArea
-    capsuleWindow.setBounds({
-      x: Math.round(x + width - CAPSULE_W - CAPSULE_MARGIN),
-      y: Math.round(y + CAPSULE_MARGIN),
-      width: CAPSULE_W,
-      height: CAPSULE_H
-    })
-  }
-
-  function createCapsule() {
-    if (capsuleWindow && !capsuleWindow.isDestroyed()) return capsuleWindow
-    const { x, y, width } = screen.getPrimaryDisplay().workArea
-    capsuleWindow = new BrowserWindow({
-      width: CAPSULE_W,
-      height: CAPSULE_H,
-      x: Math.round(x + width - CAPSULE_W - CAPSULE_MARGIN),
-      y: Math.round(y + CAPSULE_MARGIN),
-      transparent: true,
+  function create() {
+    if (win && !win.isDestroyed()) return win
+    win = new BrowserWindow({
+      width: CAPSULE_WIDTH,
+      height: COLLAPSED_HEIGHT,
       frame: false,
-      alwaysOnTop: true,
+      transparent: true,
       resizable: false,
       movable: false,
       minimizable: false,
       maximizable: false,
       fullscreenable: false,
+      alwaysOnTop: true,
       skipTaskbar: true,
-      focusable: false,   // 不抢焦点：点胶囊不打断用户正在做的事
+      focusable: false,
       hasShadow: false,
       show: false,
       webPreferences: {
         preload: path.join(__dirname, 'capsule-preload.cjs'),
         contextIsolation: true,
-        nodeIntegration: false,
         sandbox: true,
-        backgroundThrottling: false
+        nodeIntegration: false
       }
     })
-    capsuleWindow.setAlwaysOnTop(true, 'screen-saver')
-    if (process.platform === 'darwin') {
-      capsuleWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
-    }
-    // 默认整窗穿透（forward 让渲染层仍能收到 mousemove，用来判断指针是否进入胶囊）
-    capsuleWindow.setIgnoreMouseEvents(true, { forward: true })
-    capsuleWindow.loadFile(path.join(__dirname, 'capsule.html'))
-    capsuleWindow.once('ready-to-show', () => {
-      if (!capsuleWindow || capsuleWindow.isDestroyed()) return
-      capsuleWindow.showInactive() // 不抢焦点
-      refreshCapsule()
-      startRefreshTimer()
+
+    win.setAlwaysOnTop(true, 'screen-saver')
+    // 先整窗穿透：不抢占桌面点击；forward 让渲染层仍能收到 mousemove 做悬停判定
+    ignoring = true
+    win.setIgnoreMouseEvents(true, { forward: true })
+    place(win)
+    win.loadFile(path.join(__dirname, 'capsule.html'))
+    win.once('ready-to-show', () => {
+      place(win)
+      win.showInactive() // 不抢焦点
+      // 跨天自愈：收起态不会自己展开，每 60s 主动拉一次，读一次就把日期对齐到今天
+      if (selftick) clearInterval(selftick)
+      selftick = setInterval(() => pushRefresh(), SELFTICK_MS)
+      if (selftick.unref) selftick.unref()
     })
-    capsuleWindow.on('closed', () => { capsuleWindow = null })
-    // 换分辨率/插拔屏：位置重算，否则会飘出屏幕（只挂一次，窗口重建不叠加）
-    if (!screenListenerBound) {
-      screenListenerBound = true
-      const reposition = () => positionCapsule()
-      screen.on('display-metrics-changed', reposition)
-      screen.on('display-added', reposition)
-      screen.on('display-removed', reposition)
-    }
-    return capsuleWindow
-  }
 
-  function toggleCapsule(force) {
-    visible = typeof force === 'boolean' ? force : !visible
-    if (visible) {
-      createCapsule()
-      if (capsuleWindow && !capsuleWindow.isDestroyed()) capsuleWindow.showInactive()
-    } else if (capsuleWindow && !capsuleWindow.isDestroyed()) {
-      capsuleWindow.hide()
-    }
-    if (onStateChange) onStateChange()
-    return visible
-  }
-
-  // ---------- 专注设置卡 ----------
-  function openFocusCard() {
-    if (cardWindow && !cardWindow.isDestroyed()) {
-      cardWindow.show()
-      cardWindow.focus()
-      return cardWindow
-    }
-    const work = screen.getPrimaryDisplay().workArea
-    cardWindow = new BrowserWindow({
-      width: CARD_W,
-      height: CARD_H,
-      x: Math.round(work.x + (work.width - CARD_W) / 2),
-      y: Math.round(work.y + (work.height - CARD_H) / 2),
-      frame: false,
-      resizable: false,
-      minimizable: false,
-      maximizable: false,
-      skipTaskbar: true,
-      alwaysOnTop: true,
-      show: false,
-      backgroundColor: '#f6f6f6',
-      webPreferences: {
-        preload: path.join(__dirname, 'capsule-preload.cjs'),
-        contextIsolation: true,
-        nodeIntegration: false,
-        sandbox: true
-      }
+    win.on('closed', () => {
+      if (selftick) { clearInterval(selftick); selftick = null }
+      win = null
+      ignoring = true
     })
-    cardWindow.loadFile(path.join(__dirname, 'focus.html'))
-    cardWindow.once('ready-to-show', () => {
-      if (!cardWindow || cardWindow.isDestroyed()) return
-      cardWindow.show()
-      cardWindow.focus() // 要打字，必须拿焦点
-    })
-    cardWindow.on('closed', () => { cardWindow = null })
-    return cardWindow
+
+    screen.on('display-metrics-changed', () => place(win))
+    screen.on('display-added', () => place(win))
+    screen.on('display-removed', () => place(win))
+    return win
   }
 
-  function closeFocusCard() {
-    if (cardWindow && !cardWindow.isDestroyed()) cardWindow.close()
-  }
+  // 数据读取通道：胶囊每次展开 / 定时刷新都走这里，不缓存、不落盘
+  ipcMain.handle('capsule:state', () => buildPayload())
 
-  // ---------- 计时 ----------
-  function tickPayload() {
-    if (!session) return { focusing: false, remainMs: 0, text: '' }
-    const remain = remainingMs(session.endAt)
-    return { focusing: remain > 0, remainMs: remain, text: formatCountdown(remain), minutes: session.minutes }
-  }
-
-  /**
-   * 跨天自愈：数值只在"下一次读写"时才会重置（stats-store 的设计），
-   * 如果用户开着桌宠过夜、也不点任何东西，胶囊会一直显示昨天的数字。
-   * 这里用 60 秒的轻量轮询兜底——读一次就会触发 stats-store 的跨天重置并广播刷新。
-   */
-  function startRefreshTimer() {
-    if (refreshTimer) return
-    refreshTimer = setInterval(() => {
-      try {
-        refreshCapsule()
-      } catch (e) {
-        console.error('[PetPet][数值] 定时刷新失败:', e && e.message)
-      }
-    }, REFRESH_MS)
-    if (refreshTimer.unref) refreshTimer.unref()
-  }
-
-  function stopTick() {
-    if (tickTimer) {
-      clearInterval(tickTimer)
-      tickTimer = null
-    }
-  }
-
-  function startTick() {
-    stopTick()
-    tickTimer = setInterval(() => {
-      const payload = tickPayload()
-      if (!payload.focusing) {
-        finishFocus('natural')
-        return
-      }
-      sendToCapsule('focus:tick', payload)
-    }, TICK_MS)
-    if (tickTimer.unref) tickTimer.unref()
-  }
-
-  /** 专注结束（自然归零或提前结束）：清状态 → 唤醒桌宠 → 胶囊回常规态 */
-  function finishFocus(how) {
-    if (!session) return { ok: true, already: true }
-    session = null
-    stopTick()
-    clearFocusFile()
-    // 让桌宠恢复：A 的 focus:state 钩子负责"取消变暗 + 恢复随机行为"
-    notifyPet('focus:state', false)
-    if (how !== 'shutdown') {
-      notifyPet('pet:action', 'wiggle')
-      notifyPet('pet:bubble', WAKE_BUBBLE)
-    }
-    sendToCapsule('focus:tick', { focusing: false, remainMs: 0, text: '' })
-    refreshCapsule()
-    if (onStateChange) onStateChange()
-    console.log(`[PetPet][专注] 结束（${how}）`)
-    return { ok: true }
-  }
-
-  function startFocus(rawMinutes) {
-    const parsed = parseMinutes(rawMinutes)
-    if (!parsed.ok) return { ok: false, error: parsed.error }
-    // 重复开始：先收掉旧会话，避免两个计时器打架
-    if (session) finishFocus('restart')
-    const { endAt } = endAtFromMinutes(parsed.minutes)
-    session = { endAt, minutes: parsed.minutes, startedAt: Date.now() }
-    writeFocus(session)
-    notifyPet('focus:state', true)
-    startTick()
-    const payload = tickPayload()
-    sendToCapsule('focus:tick', payload)
-    refreshCapsule()
-    if (onStateChange) onStateChange()
-    console.log(`[PetPet][专注] 开始 ${parsed.minutes} 分钟 → 结束于 ${new Date(endAt).toLocaleTimeString()}`)
-    return { ok: true, ...payload, endAt }
-  }
-
-  function stopFocus() {
-    return finishFocus('manual')
-  }
-
-  /** 启动时恢复：endAt 未到就继续，已过就清文件（时间是绝对的，不存在双重计时） */
-  function restore() {
-    let raw = null
+  // 窗口高度跟着卡片走：若固定 260px 高，收起后下方约 200px 的透明区会吃掉桌面点击
+  // （点不到下面的图标/文件）。渲染层在收起动画结束后才发 false，避免动画被裁掉。
+  ipcMain.on('capsule:expanded', (_evt, expanded) => {
+    if (!win || win.isDestroyed()) return
+    const height = expanded ? EXPANDED_HEIGHT : COLLAPSED_HEIGHT
     try {
-      raw = JSON.parse(fs.readFileSync(focusFile, 'utf-8'))
+      const bounds = win.getBounds()
+      if (bounds.height === height) return
+      win.setBounds({ x: bounds.x, y: bounds.y, width: bounds.width, height })
     } catch (e) {
-      if (e && e.code !== 'ENOENT') console.error('[PetPet][专注] 读档失败，按无会话处理:', e.message)
+      console.error('[capsule] 调整窗口高度失败:', e)
     }
-    const revived = normalizeFocus(raw)
-    if (!revived) {
-      if (raw) clearFocusFile()
-      return null
-    }
-    session = revived
-    notifyPet('focus:state', true)
-    startTick()
-    refreshCapsule()
-    console.log(`[PetPet][专注] 重启恢复，剩余 ${formatCountdown(remainingMs(session.endAt))}`)
-    return session
-  }
+  })
 
-  // ---------- IPC ----------
-  ipcMain.handle('capsule:get', () => model())
-  ipcMain.handle('capsule:toggle', (_evt, force) => ({ visible: toggleCapsule(force) }))
-  ipcMain.on('capsule:setIgnoreMouse', (_evt, ignore) => {
-    if (!capsuleWindow || capsuleWindow.isDestroyed()) return
-    capsuleWindow.setIgnoreMouseEvents(!!ignore, { forward: true })
+  // 鼠标穿透：展开期间接管鼠标，移出后立刻交还（不等收起动画）
+  ipcMain.on('capsule:ignore-mouse', (_evt, ignore) => {
+    if (!win || win.isDestroyed()) return
+    const next = Boolean(ignore)
+    if (next === ignoring) return
+    ignoring = next
+    if (next) win.setIgnoreMouseEvents(true, { forward: true })
+    else win.setIgnoreMouseEvents(false)
   })
-  ipcMain.handle('focus:get', () => ({ ...tickPayload(), endAt: session ? session.endAt : null }))
-  ipcMain.handle('focus:start', (_evt, minutes) => {
-    const r = startFocus(minutes)
-    if (r.ok) closeFocusCard()
-    return r
-  })
-  ipcMain.handle('focus:stop', () => stopFocus())
-  ipcMain.on('focus:request', () => openFocusCard())
-  ipcMain.on('focus:card:close', () => closeFocusCard())
-  ipcMain.handle('focus:card:getDefault', () => ({ minutes: 25, presets: [15, 25, 45, 60], max: 180 }))
 
   return {
-    createCapsule,
-    toggleCapsule,
-    openFocusCard,
-    closeFocusCard,
-    refreshCapsule,
-    startFocus,
-    stopFocus,
-    restore,
-    isFocusing: () => !!(session && remainingMs(session.endAt) > 0),
-    /** 桌宠页面加载完成后补发一次（启动时的 restore 早于渲染层 ready，会丢） */
-    announceFocusState: () => {
-      notifyPet('focus:state', !!(session && remainingMs(session.endAt) > 0))
-    },
-    tickPayload,
-    isCapsuleVisible: () => visible,
-    /** 退出前清理计时器，避免 app.quit 时留下 interval */
-    dispose() {
-      stopTick()
-      if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null }
-      session = null
-    }
+    create,
+    // 宠物切换等时机主动推一次刷新（胶囊自己也会在展开时拉一次，双保险）
+    refresh: pushRefresh,
+    getWindow: () => win
   }
 }
 
-module.exports = { registerStatusFocus, WAKE_BUBBLE, CAPSULE_W, CAPSULE_H }
+module.exports = {
+  registerStatusFocus,
+  pickSprite,
+  spriteUrl,
+  CAPSULE_WIDTH,
+  COLLAPSED_HEIGHT,
+  EXPANDED_HEIGHT
+}

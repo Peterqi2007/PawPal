@@ -1,155 +1,246 @@
-// 状态胶囊渲染（只负责画，不在渲染层算数值——数值由主进程 capsule:get 给）
+// B-2 胶囊渲染层：只画 UI，数据全部来自主进程 capsule:state（单一真源）
 'use strict'
 
-const $ = (id) => document.getElementById(id)
-const capsule = $('capsule')
-const panel = $('panel')
-const bar = $('bar')
+const HOVER_IN_MS = 150 // 悬停 150ms 展开
+const HOVER_OUT_MS = 300 // 移出 300ms 收起
+const REFRESH_MS = 2000 // 展开期间定时刷新（外面喂食/摸头能马上反映）
+const CHECKIN_SHOW = 3 // 打卡点只展示前 3 次（与计分规则一致）
 
-let model = null
+const el = {
+  capsule: document.getElementById('capsule'),
+  avatar: document.getElementById('avatar'),
+  name: document.getElementById('name'),
+  hint: document.getElementById('hint'),
+  dot: document.getElementById('dot'),
+  date: document.getElementById('date'),
+  barSatiety: document.getElementById('barSatiety'),
+  barMood: document.getElementById('barMood'),
+  valSatiety: document.getElementById('valSatiety'),
+  valMood: document.getElementById('valMood'),
+  dots: document.getElementById('dots'),
+  checkinText: document.getElementById('checkinText'),
+  focusRow: document.getElementById('focusRow'),
+  focusTime: document.getElementById('focusTime'),
+  endFocus: document.getElementById('endFocus')
+}
+
 let expanded = false
-let expandTimer = null
-let collapseTimer = null
-let ignoring = true // 起始整窗穿透
+let ignoreMouse = true
+let inTimer = 0
+let outTimer = 0
+let refreshTimer = 0
+let shrinkTimer = 0
+let focusState = null // { active, minutes, endAt }
+let focusTimer = 0
+let lastStats = null
 
-// 收起态只保留顶部 48+12 的可交互区；展开态算上整个面板
-const BAR_H = 60
-let panelH = 0
-
-function interactiveRects() {
-  const rects = [{ x: 0, y: 0, w: window.innerWidth, h: BAR_H }]
-  if (expanded && panelH > 0) {
-    const r = panel.getBoundingClientRect()
-    rects.push({ x: r.x, y: r.y, w: r.width, h: r.height })
-  }
-  return rects
-}
-
-function hitInteractive(x, y) {
-  return interactiveRects().some((r) => x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h)
-}
-
-/** 指针进/出胶囊区时开关穿透：透明区域必须能点到下层应用 */
-function setIgnore(next) {
-  if (next === ignoring) return
-  ignoring = next
-  window.capsuleAPI.setIgnoreMouse(next)
-}
-
-function render() {
-  if (!model) return
-  $('pet-name').textContent = model.name
-  $('pet-sub').textContent = model.focusing
-    ? model.focusText
-    : model.hasStats
-      ? `心情 ${model.moodText} · 饱腹 ${model.satietyText}`
-      : model.emptyHint
-
-  // 头像：精灵表首帧（background-size 按帧数铺开，只露第一格）
-  const avatarEl = $('avatar')
-  if (model.avatarUrl) {
-    avatarEl.style.backgroundImage = `url("${model.avatarUrl}")`
-    avatarEl.style.backgroundSize = `${model.avatarFrames * 100}% 100%`
-    avatarEl.style.backgroundPosition = '0 0'
-    avatarEl.innerHTML = ''
-  }
-
-  const dot = $('status-dot')
-  dot.className = `dot ${model.statusDot}`
-
-  $('panel-date').textContent = model.dateLabel
-  $('mood-fill').style.width = `${model.mood}%`
-  $('satiety-fill').style.width = `${model.satiety}%`
-  $('mood-value').textContent = model.moodText
-  $('satiety-value').textContent = model.satietyText
-
-  $('checkin-value').textContent = model.checkinText
-  const dots = $('checkin-dots').children
-  for (let i = 0; i < dots.length; i++) {
-    dots[i].className = model.checkinDots[i] ? 'on' : ''
-  }
-
-  $('focus-block').classList.toggle('hidden', !model.focusing)
-  if (model.focusing) {
-    $('focus-text').textContent = model.focusText
-    $('focus-fill').style.width = `${Math.round(model.focusProgress * 100)}%`
-    $('focus-start').textContent = '↻ 调整专注时长'
-  } else {
-    $('focus-start').textContent = '🕐 开始专注'
-  }
+function setIgnoreMouse(next) {
+  if (next === ignoreMouse) return
+  ignoreMouse = next
+  if (window.capsule) window.capsule.setIgnoreMouse(next)
 }
 
 function expand() {
-  clearTimeout(collapseTimer)
-  clearTimeout(expandTimer)
   if (expanded) return
-  expandTimer = setTimeout(() => {
-    expanded = true
-    capsule.classList.add('expanded')
-    panelH = panel.getBoundingClientRect().height
-    setIgnore(false) // 展开时一定可交互
-  }, 150)
+  expanded = true
+  clearTimeout(shrinkTimer)
+  shrinkTimer = 0
+  el.capsule.classList.add('expanded')
+  if (window.capsule) window.capsule.setExpanded(true) // 窗口长高，完整露出面板
+  refresh() // 展开时立刻拉一次，避免看到 2 秒前的旧值
+  refreshTimer = setInterval(refresh, REFRESH_MS)
 }
 
 function collapse() {
-  clearTimeout(expandTimer)
-  clearTimeout(collapseTimer)
   if (!expanded) return
-  collapseTimer = setTimeout(() => {
-    expanded = false
-    capsule.classList.remove('expanded')
-    setIgnore(true) // 收起后恢复穿透
-  }, 300)
+  expanded = false
+  el.capsule.classList.remove('expanded')
+  clearInterval(refreshTimer)
+  refreshTimer = 0
+  setIgnoreMouse(true) // 立刻交还鼠标，别在收起动画期间挡住桌面点击
+  // 收起动画 180ms 结束后再缩窗口，否则面板会被窗口裁掉
+  clearTimeout(shrinkTimer)
+  shrinkTimer = setTimeout(() => {
+    shrinkTimer = 0
+    if (!expanded && window.capsule) window.capsule.setExpanded(false)
+  }, 220)
 }
 
-// ---------- 事件 ----------
-window.addEventListener('mousemove', (e) => {
-  const inside = hitInteractive(e.clientX, e.clientY)
-  setIgnore(!inside)
-  if (inside) expand()
-  else collapse()
-})
+function formatDate(now) {
+  const week = '日一二三四五六'
+  return `${now.getMonth() + 1}月${now.getDate()}日 周${week[now.getDay()]}`
+}
 
-document.addEventListener('mouseleave', () => collapse())
+// 一句人话的状态摘要：优先说最差的那项
+function hintOf(stats) {
+  if (!stats) return '状态读取中…'
+  if (stats.satiety <= 20) return '肚子空空的'
+  if (stats.mood <= 20) return '心情有点低落'
+  if (stats.mood <= 40) return '想被摸摸头'
+  if (stats.satiety <= 40) return '有点饿了'
+  if (stats.mood >= 90 && stats.satiety >= 80) return '状态超棒'
+  return '今天也很好'
+}
 
-bar.addEventListener('click', (e) => {
-  // 点状态条 = 手动开/关面板（触控板用户不爱悬停）
-  if (e.target.closest('button')) return
-  if (expanded) collapse()
-  else {
-    expanded = true
-    capsule.classList.add('expanded')
-    panelH = panel.getBoundingClientRect().height
-    setIgnore(false)
+function dotClassOf(stats) {
+  if (!stats) return ''
+  const worst = Math.min(stats.satiety, stats.mood)
+  if (worst <= 20) return 'bad'
+  if (worst <= 40) return 'warn'
+  return 'ok'
+}
+
+function setAvatar(avatar) {
+  if (!avatar || !avatar.url) {
+    el.avatar.style.backgroundImage = 'none'
+    return
   }
-})
+  // 精灵表整张按高度铺满，background-position 归零即首帧
+  el.avatar.style.backgroundImage = `url("${avatar.url}")`
+  el.avatar.style.backgroundSize = 'auto 100%'
+  el.avatar.style.backgroundPosition = 'left center'
+}
 
-$('focus-start').addEventListener('click', () => window.capsuleAPI.focusRequest())
-$('focus-stop').addEventListener('click', () => window.capsuleAPI.focusStop())
+// 与 viewer/focus-time.cjs 的 formatCountdown 保持一致（渲染层是普通脚本，不能 require）
+function formatCountdown(ms) {
+  const n = Number(ms)
+  if (!Number.isFinite(n) || n <= 0) return '00:00'
+  const total = Math.ceil(n / 1000)
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
+}
 
-window.capsuleAPI.onRefresh((next) => {
-  model = next
-  render()
-})
-
-window.capsuleAPI.onFocusTick((payload) => {
-  if (!model) return
-  model.focusing = !!payload.focusing
-  model.focusText = payload.focusing ? `FOCUS ${payload.text}` : ''
-  model.statusDot = payload.focusing ? 'focus' : model.checkinDots.every(Boolean) ? 'idle' : 'pending'
-  if (payload.focusing && payload.minutes) {
-    const total = payload.minutes * 60000
-    model.focusProgress = 1 - Math.max(0, payload.remainMs) / total
+function stopFocusTick() {
+  if (focusTimer) {
+    clearInterval(focusTimer)
+    focusTimer = 0
   }
-  render()
+}
+
+// 专注倒计时按 endAt 算（绝对时间），每秒只刷新文字，不向主进程要数据
+function startFocusTick() {
+  if (focusTimer) return
+  focusTimer = setInterval(() => {
+    if (!focusState) {
+      stopFocusTick()
+      return
+    }
+    const left = focusState.endAt - Date.now()
+    if (left <= 0) {
+      stopFocusTick()
+      el.focusTime.textContent = '00:00'
+      el.hint.textContent = 'FOCUS 00:00'
+      refresh() // 主进程会清掉状态并广播，以主进程为准
+      return
+    }
+    const text = formatCountdown(left)
+    el.focusTime.textContent = text
+    el.hint.textContent = 'FOCUS ' + text
+  }, 1000)
+}
+
+function applyFocus(focus) {
+  focusState = focus && focus.active ? focus : null
+  el.focusRow.classList.toggle('show', !!focusState)
+  if (!focusState) {
+    stopFocusTick()
+    el.focusTime.textContent = '00:00' // 复位残留值，下次专注开始不会闪一下旧时间
+    el.hint.textContent = hintOf(lastStats)
+    return
+  }
+  const left = Math.max(0, focusState.endAt - Date.now())
+  const text = formatCountdown(left)
+  el.focusTime.textContent = text
+  el.hint.textContent = 'FOCUS ' + text
+  startFocusTick()
+}
+
+function renderEmpty() {
+  lastStats = null
+  focusState = null
+  stopFocusTick()
+  el.focusRow.classList.remove('show')
+  el.name.textContent = '还没有宠物'
+  el.hint.textContent = '在菜单里挑一只吧'
+  el.dot.className = 'dot'
+  setAvatar(null)
+  el.valSatiety.textContent = '—'
+  el.valMood.textContent = '—'
+  el.barSatiety.style.width = '0%'
+  el.barMood.style.width = '0%'
+  el.dots.innerHTML = ''
+  el.checkinText.textContent = '还没有数据'
+}
+
+function render(payload) {
+  if (!payload || !payload.ok) {
+    renderEmpty()
+    return
+  }
+
+  const stats = payload.stats
+  lastStats = stats
+  el.name.textContent = payload.name
+  el.hint.textContent = hintOf(stats)
+  el.dot.className = `dot ${dotClassOf(stats)}`
+  el.date.textContent = formatDate(new Date())
+  setAvatar(payload.avatar)
+
+  const satiety = stats ? Math.max(0, Math.min(100, Number(stats.satiety) || 0)) : 0
+  const mood = stats ? Math.max(0, Math.min(100, Number(stats.mood) || 0)) : 0
+  const checkins = stats ? Math.max(0, Number(stats.checkins) || 0) : 0
+
+  el.valSatiety.textContent = String(satiety)
+  el.valMood.textContent = String(mood)
+  el.barSatiety.style.width = `${satiety}%`
+  el.barMood.style.width = `${mood}%`
+
+  el.dots.innerHTML = ''
+  for (let i = 0; i < CHECKIN_SHOW; i++) {
+    const dot = document.createElement('i')
+    if (i < checkins) dot.className = 'done'
+    el.dots.appendChild(dot)
+  }
+  el.checkinText.textContent = checkins > 0 ? `今天已打卡 ${checkins} 次` : '还没打卡'
+  // 专注态覆盖头部摘要（FOCUS 24:59），并露出面板里的「提前结束」
+  applyFocus(payload.focus)
+}
+
+async function refresh() {
+  if (!window.capsule) return
+  try {
+    render(await window.capsule.state())
+  } catch (e) {
+    console.error('[capsule] 读取状态失败', e)
+  }
+}
+
+// 提前结束：主进程统一收尾（清 focus.json + 广播），胶囊下次刷新就回常规态
+el.endFocus.addEventListener('click', () => {
+  if (window.capsule) window.capsule.endFocus()
 })
 
-// 首次加载：主动拉一次（不依赖主进程的 ready-to-show 时序）
-window.capsuleAPI.get().then((m) => {
-  model = m
-  render()
-  setIgnore(true)
+// 悬停：进入 150ms 展开并接管鼠标；移出 300ms 收起并恢复穿透
+el.capsule.addEventListener('mouseenter', () => {
+  clearTimeout(outTimer)
+  outTimer = 0
+  setIgnoreMouse(false)
+  if (!inTimer) inTimer = setTimeout(() => { inTimer = 0; expand() }, HOVER_IN_MS)
 })
 
-// 面板展开后高度可能变（专注块出现/消失），重算一次
-window.addEventListener('resize', () => { panelH = panel.getBoundingClientRect().height })
+el.capsule.addEventListener('mouseleave', () => {
+  clearTimeout(inTimer)
+  inTimer = 0
+  if (!outTimer) outTimer = setTimeout(() => {
+    outTimer = 0
+    // 悬停不足 150ms 就离开时还没展开，但鼠标已被接管，这里要交还
+    if (expanded) collapse()
+    else setIgnoreMouse(true)
+  }, HOVER_OUT_MS)
+})
+
+// 主进程主动推刷新（切宠物等）
+if (window.capsule && window.capsule.onRefresh) {
+  window.capsule.onRefresh(refresh)
+}
+
+refresh()
