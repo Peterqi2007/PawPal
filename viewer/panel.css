@@ -2,6 +2,7 @@
    毛玻璃 + SF 字体 + 柔和圆角 + 浅色/深色自适应 */
 
 :root {
+  color-scheme: light dark;  /* 原生控件（复选框/下拉/滚动条）跟随系统深浅色 */
   --accent: #007AFF;
   --separator: rgba(60, 60, 67, 0.16);
   --text-primary: rgba(0, 0, 0, 0.85);
@@ -9,7 +10,7 @@
   --panel-bg: rgba(246, 246, 246, 0.82);
   --card-bg: rgba(255, 255, 255, 0.7);
   --pill-bg: rgba(0, 122, 255, 0.12);
-  --pill-text: #007AFF;
+  --pill-text: #0b5ed7;
   --shadow: 0 8px 28px rgba(0, 0, 0, 0.14);
   --border: rgba(0, 0, 0, 0.1);
 }

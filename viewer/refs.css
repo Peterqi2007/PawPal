@@ -6,14 +6,21 @@
   --card: #ffffff;
   --ink: #1d1c1a;
   --ink-2: #6b6862;
-  --ink-3: #a19c94;
+  --ink-3: #8b857c;     /* 提示文字：2.62:1 → 3.68:1（WCAG AA 小字需 4.5，这里先保证可读且不改变层级观感） */
   --line: #edeae4;
   --line-strong: #e3dfd8;
-  --orange: #f0851f;
-  --orange-deep: #e07b2f;
+  --orange: #d9701f;    /* 文字/图标用橙；实心白字按钮另有 --orange-btn */
+  --orange-deep: #c9661a;
   --orange-soft: #fbeee1;
   --orange-wash: #fff8f1;
   --danger: #c4453c;
+  /* 面层令牌：深色模式下必须整体翻面，否则「白底 + 白字」会糊在一起 */
+  --surface-2: #fbfaf8;      /* 次级面：拖拽区 / 工具条 / 设置面板 / 档案卡 */
+  --field-bg: #ffffff;       /* 输入框 / 下拉 / 次级按钮 */
+  --chip-bg: rgba(255, 255, 255, 0.6);
+  --badge-pose-bg: rgba(255, 255, 255, 0.9);
+  --orange-btn: #d9701f;     /* 白字按钮底：对比度 ≥3:1（原 #f0851f 只有 2.6:1） */
+  color-scheme: light dark;  /* 原生控件（复选框/下拉/滚动条）跟随系统深浅色 */
   --radius-card: 20px;
   --radius-zone: 16px;
   --radius-ctl: 12px;
@@ -56,7 +63,7 @@ body {
   width: 30px;
   height: 30px;
   border-radius: 9px;
-  background: var(--orange);
+  background: var(--orange-btn);
   color: #fff;
   font-size: 15px;
   display: flex;
@@ -160,7 +167,7 @@ body {
   flex-shrink: 0;
   border: 1.5px dashed var(--line-strong);
   border-radius: var(--radius-zone);
-  background: #fbfaf8;
+  background: var(--surface-2);
   padding: 18px 20px 20px;
   display: flex;
   flex-direction: column;
@@ -237,7 +244,7 @@ body {
   gap: 6px;
   flex-shrink: 0;
   border: 1px solid var(--line-strong);
-  background: #fff;
+  background: var(--field-bg);
   color: var(--ink-2);
   font-family: inherit;
   font-size: 12px;
@@ -286,7 +293,7 @@ body {
   gap: 8px;
   flex-shrink: 0;
   padding: 10px 12px;
-  background: #fbfaf8;
+  background: var(--surface-2);
   border: 1px solid var(--line);
   border-radius: var(--radius-ctl);
 }
@@ -299,7 +306,7 @@ body {
   font-family: inherit;
   font-size: 12.5px;
   color: var(--ink);
-  background: #fff;
+  background: var(--field-bg);
   border: 1px solid var(--line-strong);
   border-radius: 8px;
   padding: 7px 11px;
@@ -319,15 +326,15 @@ body {
 }
 
 .g-ok {
-  background: var(--orange);
+  background: var(--orange-btn);
   color: #fff;
   font-weight: 600;
 }
 
-.g-ok:hover { background: #e0781a; }
+.g-ok:hover { background: #c65f14; }
 
 .g-cancel {
-  background: #fff;
+  background: var(--field-bg);
   border-color: var(--line-strong);
   color: var(--ink-2);
 }
@@ -363,7 +370,7 @@ body {
   font-size: 12px;
   font-weight: 600;
   color: #fff;
-  background: var(--orange);
+  background: var(--orange-btn);
   border: 1px solid var(--orange);
   border-radius: 10px;
   padding: 7px 14px;
@@ -371,7 +378,7 @@ body {
   transition: background 0.12s, opacity 0.12s;
 }
 
-.btn-redraw:hover { background: #e0781a; }
+.btn-redraw:hover { background: #c65f14; }
 .btn-redraw:disabled { opacity: 0.55; cursor: progress; }
 .btn-redraw.is-busy { background: #b8b2a9; border-color: #b8b2a9; cursor: progress; }
 
@@ -382,7 +389,7 @@ body {
   font-family: inherit;
   font-size: 12px;
   color: var(--ink);
-  background: #fff;
+  background: var(--field-bg);
   border: 1px solid var(--line-strong);
   border-radius: 9px;
   padding: 6px 8px;
@@ -416,7 +423,7 @@ body {
   gap: 8px 10px;
   flex-shrink: 0;
   padding: 8px 12px;
-  background: #fbfaf8;
+  background: var(--surface-2);
   border: 1px solid var(--line);
   border-radius: var(--radius-ctl);
 }
@@ -427,7 +434,7 @@ body {
   font-family: inherit;
   font-size: 12px;
   color: var(--ink);
-  background: #fff;
+  background: var(--field-bg);
   border: 1px solid var(--line-strong);
   border-radius: 8px;
   padding: 6px 9px;
@@ -442,7 +449,7 @@ body {
   font-size: 12px;
   font-weight: 600;
   color: var(--ink-2);
-  background: #fff;
+  background: var(--field-bg);
   border: 1px solid var(--line-strong);
   border-radius: 9px;
   padding: 6px 12px;
@@ -454,11 +461,11 @@ body {
 
 .pet-btn.primary {
   color: #fff;
-  background: var(--orange);
+  background: var(--orange-btn);
   border-color: var(--orange);
 }
 
-.pet-btn.primary:hover { background: #e0781a; }
+.pet-btn.primary:hover { background: #c65f14; }
 
 .pet-now { font-size: 11.5px; color: var(--ink-3); margin-left: auto; }
 
@@ -484,7 +491,7 @@ body {
   background-size: calc(var(--frames, 12) * 96px) 96px;
   animation: strip-play var(--dur, 2.4s) steps(var(--frames, 12)) infinite;
   border-radius: 10px;
-  background-color: rgba(255, 255, 255, 0.6);
+  background-color: var(--chip-bg);
 }
 
 @keyframes strip-play {
@@ -507,7 +514,7 @@ body {
   height: 28px;
   border-radius: 8px;
   border: 1px solid var(--line-strong);
-  background: #fff;
+  background: var(--field-bg);
   color: var(--ink-2);
   font-size: 13px;
   line-height: 1;
@@ -524,7 +531,7 @@ body {
   flex-direction: column;
   gap: 10px;
   padding: 12px 14px;
-  background: #fbfaf8;
+  background: var(--surface-2);
   border: 1px solid var(--line);
   border-radius: var(--radius-ctl);
 }
@@ -545,7 +552,7 @@ body {
   font-family: inherit;
   font-size: 12.5px;
   color: var(--ink);
-  background: #fff;
+  background: var(--field-bg);
   border: 1px solid var(--line-strong);
   border-radius: 8px;
   padding: 6px 10px;
@@ -606,7 +613,7 @@ body {
 /* 宠物档案卡 */
 .profile {
   flex-shrink: 0;
-  background: #fbfaf8;
+  background: var(--surface-2);
   border: 1px solid var(--line);
   border-radius: var(--radius-ctl);
   padding: 12px 14px;
@@ -634,7 +641,7 @@ body {
   font-family: inherit;
   font-size: 12.5px;
   color: var(--ink);
-  background: #fff;
+  background: var(--field-bg);
   border: 1px solid var(--line-strong);
   border-radius: 9px;
   padding: 7px 10px;
@@ -650,7 +657,7 @@ body {
   font-family: inherit;
   font-size: 12px;
   color: var(--ink-2);
-  background: #fff;
+  background: var(--field-bg);
   border: 1px solid var(--line-strong);
   border-radius: 9px;
   padding: 7px 0;
@@ -673,7 +680,7 @@ body {
   align-items: center;
   gap: 2px;
   font-family: inherit;
-  background: #fff;
+  background: var(--field-bg);
   border: 1px solid var(--line-strong);
   border-radius: 10px;
   padding: 8px 6px;
@@ -698,21 +705,21 @@ body {
   font-size: 12px;
   font-weight: 600;
   color: #fff;
-  background: var(--orange);
+  background: var(--orange-btn);
   border: 1px solid var(--orange);
   border-radius: 9px;
   padding: 7px 16px;
   cursor: pointer;
 }
 
-.pf-save:hover { background: #e0781a; }
+.pf-save:hover { background: #c65f14; }
 
 .pf-preset {
   font-family: inherit;
   font-size: 12px;
   font-weight: 600;
   color: var(--ink-2);
-  background: #fff;
+  background: var(--field-bg);
   border: 1px solid var(--line-strong);
   border-radius: 9px;
   padding: 7px 14px;
@@ -740,7 +747,7 @@ body {
   margin: 0;
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: #fff;
+  background: var(--card);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -786,10 +793,10 @@ body {
   backdrop-filter: blur(4px);
 }
 
-.badge.setup { background: var(--orange); color: #fff; }
+.badge.setup { background: var(--orange-btn); color: #fff; }
 
 .badge.pose {
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--badge-pose-bg);
   color: var(--orange-deep);
   border: 1px solid rgba(224, 123, 47, 0.45);
 }
@@ -895,23 +902,19 @@ body {
     --ink-3: rgba(235, 235, 245, 0.45);
     --line: rgba(255, 255, 255, 0.1);
     --line-strong: rgba(255, 255, 255, 0.16);
+    /* 面层全部翻面：任何一处漏掉都会变成「白底白字」 */
+    --surface-2: #201f1e;
+    --field-bg: rgba(255, 255, 255, 0.06);
+    --chip-bg: rgba(255, 255, 255, 0.06);
+    --badge-pose-bg: rgba(240, 133, 31, 0.18);
     --orange-soft: rgba(240, 133, 31, 0.18);
     --orange-wash: rgba(240, 133, 31, 0.1);
     --shadow-card: 0 12px 32px rgba(0, 0, 0, 0.45);
   }
-  .drop { background: rgba(255, 255, 255, 0.03); }
   .drop:hover { background: rgba(255, 255, 255, 0.05); }
   .thumb { background: rgba(255, 255, 255, 0.06); }
-  .ref { background: #262524; }
   .close:hover { background: rgba(255, 255, 255, 0.12); }
-  .chip { background: rgba(255, 255, 255, 0.05); }
   .chip.is-active { background: rgba(240, 133, 31, 0.18); }
-  .group-new { background: rgba(255, 255, 255, 0.03); }
-  .group-new input { background: rgba(255, 255, 255, 0.06); color: var(--ink); }
-  .g-cancel { background: rgba(255, 255, 255, 0.06); }
-  .ark-panel { background: rgba(255, 255, 255, 0.03); }
-  .ark-row input, .ark-row select { background: rgba(255, 255, 255, 0.06); color: var(--ink); }
-  .btn-gear { background: rgba(255, 255, 255, 0.06); }
 }
 
 /* 分组胶囊上的删除按钮：默认隐藏，hover 时出现 */

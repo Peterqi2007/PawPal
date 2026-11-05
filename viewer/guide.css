@@ -1,11 +1,12 @@
 /* 使用说明窗口 —— 沿用日记面板/图库的暖白 + 橙色口语化风格 */
 
 :root {
+  color-scheme: light dark;  /* 原生控件（复选框/下拉/滚动条）跟随系统深浅色 */
   --bg: #fbfbfc;
   --card: #ffffff;
   --text: #1f2328;
   --text-dim: #6b7280;
-  --accent: #e07b39;
+  --accent: #c9661a;
   --accent-soft: #fdf1e7;
   --border: #ececf0;
   --code-bg: #f3f4f6;

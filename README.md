@@ -68,9 +68,9 @@
 
 | 项 | 现状 |
 |---|---|
-| 单测 | **303 例**（300 通过 / 3 skip）覆盖命中判定、数值状态机、提醒队列、专注计时、精灵表、图库存储、导入安全等 |
+| 单测 | **342 例**（339 通过 / 3 skip）覆盖命中判定、数值状态机、提醒队列、专注计时、精灵表、图库存储、导入安全等 |
 | CI | `素材管线测试`（3.9/3.11/3.12 三组）、`客户端构建`、`macOS 包`、`Windows 安装包` + Boundary Test |
-| 回归脚本 | `viewer/scripts/boundary-test.cjs`（打断/转移边界）、`viewer/scripts/memtest.cjs`（100 次切换纹理平台期） |
+| 回归脚本 | `viewer/scripts/boundary-test.cjs`（打断/转移边界）、`viewer/scripts/memtest.cjs`（100 次切换纹理平台期）、`viewer/scripts/dark-mode-audit.cjs`（深/浅色逐元素对比度审计） |
 | 安全 | 路径穿越白名单、zip slip 双向拦截、自由文本净化（零宽/BiDi）、密钥 `0600` 仅主进程持有 |
 
 ---
@@ -173,7 +173,7 @@ mkdir -p ~/.petpet/pets && cp -r examples/dev-pet ~/.petpet/pets/dev-pet
 ### 跑测试
 
 ```bash
-cd viewer && npm test          # vitest 303 例
+cd viewer && npm test          # vitest 342 例
 python -m pytest tests/        # 管线单测
 python pipeline/check_refs.py  # 文档矩阵引用完整性
 ```
@@ -247,7 +247,7 @@ PawPal/
 
 ## Roadmap
 
-**✅ 已完成**：素材生产线（图库 / 重绘 / 动画 / 装配 / 校验）· 桌面客户端（多宠、动作转移、提醒三件套、日记、人格气泡、命中判定）· 状态数值与情绪表现 · 状态胶囊 + 专注模式 · CI/Release 自动化 · 303 单测
+**✅ 已完成**：素材生产线（图库 / 重绘 / 动画 / 装配 / 校验）· 桌面客户端（多宠、动作转移、提醒三件套、日记、人格气泡、命中判定）· 状态数值与情绪表现 · 状态胶囊 + 专注模式 · CI/Release 自动化 · 342 单测
 
 **🔨 进行中**：Windows 真机手测闭环 · 手势与交互细化 · 文档与截图补齐
 

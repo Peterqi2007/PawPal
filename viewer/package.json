@@ -12,7 +12,8 @@
     "dist": "npm run build && electron-builder",
     "test": "vitest run",
     "test:boundary": "electron scripts/boundary-test.cjs",
-    "test:mem": "electron scripts/memtest.cjs"
+    "test:mem": "electron scripts/memtest.cjs",
+    "test:theme": "electron scripts/dark-mode-audit.cjs --theme=dark"
   },
   "dependencies": {
     "pixi.js": "^8.6.6"

@@ -71,9 +71,9 @@
 
 | Item | Status |
 |---|---|
-| Unit tests | **303 cases** (300 passing / 3 skipped) covering hit-testing, stats state machine, reminder queue, focus timing, sprite assembly, library storage, import safety |
+| Unit tests | **342 cases** (339 passing / 3 skipped) covering hit-testing, stats state machine, reminder queue, focus timing, sprite assembly, library storage, import safety |
 | CI | `pipeline tests` (3.9 / 3.11 / 3.12 groups), `client build`, `macOS package`, `Windows installer` + a separate Boundary Test workflow |
-| Regression scripts | `viewer/scripts/boundary-test.cjs` (interrupt/transition boundaries), `viewer/scripts/memtest.cjs` (100-switch texture plateau) |
+| Regression scripts | `viewer/scripts/boundary-test.cjs` (interrupt/transition boundaries), `viewer/scripts/memtest.cjs` (100-switch texture plateau), `viewer/scripts/dark-mode-audit.cjs` (per-element contrast audit in dark/light) |
 | Security | Path-traversal allow-list, zip-slip blocked on both ends, text sanitization (zero-width/BiDi), API keys `0600` main-process only |
 
 ---
@@ -178,7 +178,7 @@ interaction / stats / reminders / focus — **not production art**.
 ### Run the tests
 
 ```bash
-cd viewer && npm test          # vitest, 303 cases
+cd viewer && npm test          # vitest, 342 cases
 python -m pytest tests/        # pipeline unit tests
 python pipeline/check_refs.py  # docs matrix reference integrity
 ```
@@ -258,7 +258,7 @@ Full contract: [docs/08-接口协议.md](docs/08-接口协议.md) (Chinese). Cap
 
 **✅ Done**: asset production line (library / restyle / animation / assembly / validation) · desktop client
 (multi-pet, transition chains, reminders, diary, persona bubbles, hit-testing) · stats & expression ·
-status capsule + focus mode · CI/Release automation · 303 unit tests
+status capsule + focus mode · CI/Release automation · 342 unit tests
 
 **🔨 In progress**: Windows hands-on validation loop · gesture/interaction refinements · docs & screenshots
 

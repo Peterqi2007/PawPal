@@ -1,6 +1,6 @@
 // PawPal 桌宠查看器 - 主进程
 // Electron 主进程：透明窗口、托盘、IPC 文件读取
-const { app, BrowserWindow, Tray, Menu, ipcMain, screen, nativeImage, protocol, net, dialog } = require('electron')
+const { app, BrowserWindow, Tray, Menu, ipcMain, screen, nativeImage, nativeTheme, protocol, net, dialog } = require('electron')
 const path = require('path')
 const fs = require('fs')
 const { pathToFileURL } = require('url')
@@ -1463,6 +1463,12 @@ ipcMain.handle('pet:installed', () => {
   }
 })
 
+// 面板窗口的原生底色也要跟随系统深浅色：CSS 生效前的那一帧若还是浅色，
+// 深色模式下会闪一块白底（观感上就是「面板发白」）。
+function themedWindowBg(light, dark) {
+  return nativeTheme.shouldUseDarkColors ? dark : light
+}
+
 // 使用说明：把「重绘 → 生成视频 → 重抽帧 → 装配」这条链路讲清楚
 function openGuideWindow() {
   if (guideWindow && !guideWindow.isDestroyed()) {
@@ -1487,7 +1493,7 @@ function openGuideWindow() {
     maximizable: false,
     skipTaskbar: false,
     hasShadow: true,
-    backgroundColor: '#fbfbfc',
+    backgroundColor: themedWindowBg('#fbfbfc', '#1c1c1e'),
     webPreferences: {
       preload: path.join(__dirname, 'guide-preload.cjs'),
       contextIsolation: true,
@@ -1526,7 +1532,7 @@ function openRefsWindow() {
     minHeight: 560,
     skipTaskbar: false,
     hasShadow: true,
-    backgroundColor: '#faf9f7',
+    backgroundColor: themedWindowBg('#faf9f7', '#1b1a19'),
     webPreferences: {
       preload: path.join(__dirname, 'refs-preload.cjs'),
       contextIsolation: true,
@@ -1772,6 +1778,11 @@ app.whenReady().then(() => {
   registerPetpetProtocol()  // N-3：自定义协议（CSP 已放行 petpet:）
   registerMediaProtocol()   // 动画素材协议（petmedia:）
   createWindow()
+  // 系统深浅色切换时同步面板窗口的原生底色（页面里的 CSS 由 prefers-color-scheme 自动跟随）
+  nativeTheme.on('updated', () => {
+    if (refsWindow && !refsWindow.isDestroyed()) refsWindow.setBackgroundColor(themedWindowBg('#faf9f7', '#1b1a19'))
+    if (guideWindow && !guideWindow.isDestroyed()) guideWindow.setBackgroundColor(themedWindowBg('#fbfbfc', '#1c1c1e'))
+  })
   // B-2：右上角状态胶囊（收起 56px，悬停展开）
   // 测试脚本（scripts/boundary-test.cjs、memtest.cjs）把 getAllWindows()[0] 当主窗口用，
   // 多开一个窗口会让它们抓错窗口（pet:switch / reminder:fire 发丢）；且内存测试也不该多算一扇窗。

@@ -1,5 +1,6 @@
 /* B-3 专注设置卡：360×236 的独立小窗，圆角卡片 + 深色自适应 */
 :root {
+  color-scheme: light dark;  /* 原生控件（复选框/下拉/滚动条）跟随系统深浅色 */
   --card-bg: #ffffff;
   --card-border: rgba(15, 23, 42, 0.1);
   --text: #1f2937;
