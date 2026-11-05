@@ -4,12 +4,14 @@ import { describe, it, expect } from 'vitest'
 import {
   DEFAULT_MODEL,
   buildTaskBody,
+  buildTaskRequest,
   buildVideoPrompt,
   createSeedanceClient,
   mapHttpError,
   parseTaskCreated,
   parseTaskStatus
 } from '../seedance-client.cjs'
+import { MAX_PARAM_RETRIES } from '../model-params.cjs'
 
 const CFG = {
   apiKey: 'ark-test-key',
@@ -49,11 +51,14 @@ describe('请求体（官方字段）', () => {
     expect(body.duration).toBe(5)
     expect(body.resolution).toBe('720p')
     expect(body.watermark).toBe(true)
+    // 带首帧图时禁止传 ratio：Ark API 要求比例跟随首帧图（显式传会 400「参数不被支持」）
+    expect(body.ratio).toBeUndefined()
   })
 
-  it('无参考图时只有 text（纯文生视频）', () => {
+  it('无参考图时只有 text（纯文生视频），ratio 此时才合法', () => {
     const body = buildTaskBody({ model: 'm', prompt: 'p' }) as any
     expect(body.content).toHaveLength(1)
+    expect(body.ratio).toBe('1:1')
   })
 
   it('视频提示词：全身入镜 + 头顶留白 + 摄像机静止 + 纯绿背景', () => {
@@ -161,5 +166,77 @@ describe('客户端编排', () => {
     const r = await client.download({ url: 'https://v/x.mp4' })
     expect(r.ok).toBe(true)
     expect(Array.from(r.buffer)).toEqual([9, 8, 7])
+  })
+})
+
+// 不同模型支持的参数不同：预检负责「明显不合法的别发」，400 兜底负责「没见过的模型也能跑通」。
+describe('参数适配（跨模型鲁棒性）', () => {
+  it('buildTaskRequest：首帧图 + ratio 时省略并给出说明', () => {
+    const req = buildTaskRequest({ model: DEFAULT_MODEL, prompt: 'p', imageDataUri: IMG, ratio: '16:9' })
+    expect((req.body as any).ratio).toBeUndefined()
+    expect(req.notes.map((n) => n.param)).toContain('ratio')
+    // buildTaskBody 仍返回纯 body（旧调用点兼容）
+    expect((buildTaskBody({ model: DEFAULT_MODEL, prompt: 'p', imageDataUri: IMG }) as any).ratio).toBeUndefined()
+  })
+
+  it('模型拒绝 ratio → 省略后重试成功，notes/attempts 可追溯', async () => {
+    const bodies: any[] = []
+    const fetchImpl = async (_url: string, init: any) => {
+      const body = JSON.parse(init.body)
+      bodies.push(body)
+      if (bodies.length === 1) {
+        return jsonRes(400, {
+          error: { code: 'InvalidParameter', message: 'The parameter `ratio` specified in the request is not valid' }
+        })
+      }
+      return jsonRes(200, { id: 'cgt-retry' })
+    }
+    const client = createSeedanceClient({ fetchImpl })
+    const r = await client.createTask({
+      cfg: CFG,
+      body: { model: 'm', content: [], ratio: '1:1', duration: 5 }
+    })
+    expect(r.ok).toBe(true)
+    expect(r.taskId).toBe('cgt-retry')
+    expect(r.attempts).toBe(2)
+    expect(r.notes.map((n: any) => n.param)).toEqual(['ratio'])
+    expect(bodies[1].ratio).toBeUndefined()
+    expect(bodies[1].duration).toBe(5) // 只删被拒字段，其它参数原样保留
+  })
+
+  it('泛化 400（只说参数不合法）→ 按优先级先省略 ratio', async () => {
+    const bodies: any[] = []
+    const fetchImpl = async (_url: string, init: any) => {
+      bodies.push(JSON.parse(init.body))
+      if (bodies.length === 1) return jsonRes(400, { error: { message: '请求参数不合法' } })
+      return jsonRes(200, { id: 'cgt-2' })
+    }
+    const client = createSeedanceClient({ fetchImpl })
+    const r = await client.createTask({ cfg: CFG, body: { model: 'm', content: [], ratio: '1:1' } })
+    expect(r.ok).toBe(true)
+    expect(bodies[1].ratio).toBeUndefined()
+  })
+
+  it('必填字段被拒 → 不重试（改不了，也不该无限试）', async () => {
+    const { fetchImpl, calls } = mockFetch(() =>
+      jsonRes(400, { error: { message: 'The parameter `content` is required' } })
+    )
+    const client = createSeedanceClient({ fetchImpl })
+    const r = await client.createTask({ cfg: CFG, body: { model: 'm', content: [] } })
+    expect(r.ok).toBe(false)
+    expect(calls).toHaveLength(1)
+  })
+
+  it('持续 400 → 重试有上限，错误信息说明已省略过哪些字段', async () => {
+    const { fetchImpl, calls } = mockFetch(() => jsonRes(400, { error: { message: '请求参数不合法' } }))
+    const client = createSeedanceClient({ fetchImpl })
+    const r = await client.createTask({
+      cfg: CFG,
+      body: { model: 'm', content: [], ratio: '1:1', duration: 5, resolution: '720p', watermark: true }
+    })
+    expect(r.ok).toBe(false)
+    expect(calls).toHaveLength(1 + MAX_PARAM_RETRIES)
+    expect(r.error).toContain('已自动省略')
+    expect(r.notes.length).toBe(MAX_PARAM_RETRIES)
   })
 })

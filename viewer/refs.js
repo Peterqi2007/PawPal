@@ -623,6 +623,10 @@ api.onAnimProgress((p) => {
   } else {
     animBtn.textContent = STAGE_LABEL[p.stage] || '生成中…'
   }
+  // 参数适配是「静默发生但必须让人知道」的事：模型不吃哪个参数要说清楚
+  if (Array.isArray(p.adapted) && p.adapted.length) {
+    say(`当前模型不支持 ${p.adapted.join('、')}，已自动省略后重试`, true)
+  }
 })
 
 function setAnimBusy(on) {

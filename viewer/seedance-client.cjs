@@ -15,12 +15,25 @@
 //   HTTP 404 {code:"UnsupportedModel", message:"... does not support the agent plan feature"}。
 //   这属于账号/套餐侧的能力，不是代码问题——标准按量付费账号或含 Seedance 的套餐才可以。
 
+// 参数适配：不同模型支持的字段不同（最典型的是「首帧图生视频不能传 ratio」）。
+// 预检与 400 兜底都收敛在 model-params.cjs，本文件只负责把结果发出去。
+const {
+  DEFAULT_DURATION,
+  DEFAULT_RATIO,
+  DEFAULT_RESOLUTION,
+  MAX_PARAM_RETRIES,
+  VIDEO_DROPPABLE,
+  buildVideoBody,
+  parseRejectedParam,
+  dropParam,
+  nextDropCandidate,
+  describeNotes
+} = require('./model-params.cjs')
+
 const DEFAULT_MODEL = 'doubao-seedance-2-0-260128'
-const DEFAULT_DURATION = 5
 // 方画幅：桌宠素材最终要裁成方形格子，16:9 会逼模型把主体放大到上下出血
 // （实测 1280×720 出图里猫头顶和脚底同时贴边，裁下来就是残缺剪影）
-const DEFAULT_RATIO = '1:1'
-const DEFAULT_RESOLUTION = '720p'
+// 具体取值与「有图不传 ratio」的规则见 model-params.cjs
 const POLL_INTERVAL_MS = 5000
 const POLL_TIMEOUT_MS = 10 * 60 * 1000
 
@@ -42,22 +55,23 @@ function buildVideoPrompt({ actionDesc, style, extra }) {
   return `${st}，${act}。${tail}${more}`
 }
 
-/** 建任务请求体（实跑与 dry-run 共用） */
-function buildTaskBody({ model, prompt, imageDataUri, duration, ratio, resolution, watermark = true }) {
-  const content = [{ type: 'text', text: prompt }]
-  if (imageDataUri) content.push({ type: 'image_url', image_url: { url: imageDataUri } })
-  return {
-    model: model || DEFAULT_MODEL,
-    content,
-    duration: Number(duration) || DEFAULT_DURATION,
-    ratio: ratio || DEFAULT_RATIO,
-    resolution: resolution || DEFAULT_RESOLUTION,
-    watermark: watermark !== false
-  }
+/**
+ * 建任务请求（实跑与 dry-run 共用）。
+ * 返回 { body, profile, notes }：body 可直接发送；notes 记录被省略/回退的字段，
+ * 调用方负责落日志并提示用户——参数适配绝不能静默发生。
+ */
+function buildTaskRequest(opts = {}) {
+  // 模型缺省时回落到默认模型（与旧 buildTaskBody 行为一致），避免发出 model 为空的请求
+  return buildVideoBody({ ...opts, model: opts.model || DEFAULT_MODEL })
 }
 
-/** HTTP 状态 → 可操作的中文提示（含 Agent Plan 这一特例） */
-function mapHttpError(status, text) {
+/** 只要请求体时的便捷入口（保持旧调用点兼容） */
+function buildTaskBody(opts = {}) {
+  return buildTaskRequest(opts).body
+}
+
+/** HTTP 状态 → 可操作的中文提示（含 Agent Plan 这一特例；notes 用于说明已省略过哪些字段） */
+function mapHttpError(status, text, { notes } = {}) {
   let code = ''
   let detail = ''
   try {
@@ -75,8 +89,14 @@ function mapHttpError(status, text) {
     return '密钥无效或端点不匹配：Plan 订阅账号请把端点切到 /api/plan/v3（标准账号用 /api/v3）'
   }
   if (status === 429) return '调用过于频繁，请稍后再试'
-  if (status === 400 && /ratio|分辨率|resolution/i.test(detail)) {
-    return `参数不被支持：${detail}（可尝试 ratio=1:1 / 16:9，resolution=720p）`
+  if (status === 400 || status === 422) {
+    const dropped = describeNotes(notes)
+    if (dropped) {
+      return `参数不被支持：${detail || '模型拒绝了该请求'}（已自动省略 ${dropped} 后仍失败——请在设置里换一个视频模型，或调整生成参数）`
+    }
+    if (/ratio|分辨率|resolution|参数|parameter/i.test(detail)) {
+      return `参数不被支持：${detail}（可尝试 ratio=1:1 / 16:9，resolution=720p）`
+    }
   }
   if (status >= 500) return '服务端错误，请稍后再试'
   return `请求失败（HTTP ${status}）${detail ? '：' + detail : ''}`
@@ -123,24 +143,58 @@ function createSeedanceClient({ fetchImpl, now } = {}) {
     return { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.apiKey}` }
   }
 
-  async function createTask({ cfg, body } = {}) {
-    if (!cfg || !cfg.apiKey) return { ok: false, error: '尚未配置 API Key' }
+  /**
+   * 建任务。遇到 400/422「参数不被支持」时，从错误文案解析被拒字段，
+   * 按可丢弃白名单逐项省略并重试（最多 maxParamRetries 次）。
+   * 返回值里的 notes / attempts 会一路带回日志与面板：模型到底不吃哪个参数，必须可追溯。
+   */
+  async function createTask({ cfg, body, maxParamRetries = MAX_PARAM_RETRIES } = {}) {
+    if (!cfg || !cfg.apiKey) return { ok: false, error: '尚未配置 API Key', notes: [], attempts: 0 }
     const url = `${apiBase(cfg)}/contents/generations/tasks`
-    try {
-      const res = await fetchImpl(url, { method: 'POST', headers: headers(cfg), body: JSON.stringify(body) })
-      const text = await res.text()
-      if (!res.ok) return { ok: false, error: mapHttpError(res.status, text), status: res.status }
-      let json
+    let current = body || {}
+    const notes = []
+    for (let attempt = 0; ; attempt++) {
+      let res
+      let text
       try {
-        json = JSON.parse(text)
-      } catch {
-        return { ok: false, error: '响应解析失败（非 JSON）' }
+        res = await fetchImpl(url, { method: 'POST', headers: headers(cfg), body: JSON.stringify(current) })
+        text = await res.text()
+      } catch (e) {
+        return { ok: false, error: `网络错误：${e && e.message ? e.message : e}`, notes, attempts: attempt + 1 }
       }
-      const parsed = parseTaskCreated(json)
-      if (!parsed.ok) return { ok: false, error: parsed.error }
-      return { ok: true, taskId: parsed.taskId, url }
-    } catch (e) {
-      return { ok: false, error: `网络错误：${e && e.message ? e.message : e}` }
+      if (res.ok) {
+        let json
+        try {
+          json = JSON.parse(text)
+        } catch {
+          return { ok: false, error: '响应解析失败（非 JSON）', notes, attempts: attempt + 1 }
+        }
+        const parsed = parseTaskCreated(json)
+        if (!parsed.ok) return { ok: false, error: parsed.error, notes, attempts: attempt + 1 }
+        return { ok: true, taskId: parsed.taskId, url, notes, attempts: attempt + 1, body: current }
+      }
+      const rejected = parseRejectedParam(res.status, text)
+      if (rejected && attempt < maxParamRetries) {
+        const name = rejected.param || nextDropCandidate(current, VIDEO_DROPPABLE)
+        const next = name ? dropParam(current, name) : null
+        if (next) {
+          notes.push({
+            param: name,
+            action: 'drop',
+            detail: String(rejected.detail || '').slice(0, 160) || '模型拒绝该参数'
+          })
+          console.warn(`[PawPal][seedance] 模型拒绝参数 ${name}，已省略后重试（第 ${attempt + 2} 次请求）`)
+          current = next
+          continue
+        }
+      }
+      return {
+        ok: false,
+        error: mapHttpError(res.status, text, { notes }),
+        status: res.status,
+        notes,
+        attempts: attempt + 1
+      }
     }
   }
 
@@ -216,6 +270,7 @@ module.exports = {
   POLL_INTERVAL_MS,
   POLL_TIMEOUT_MS,
   buildVideoPrompt,
+  buildTaskRequest,
   buildTaskBody,
   mapHttpError,
   parseTaskCreated,

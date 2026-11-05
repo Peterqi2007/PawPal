@@ -105,6 +105,38 @@ describe('端点与模型纠错', () => {
     expect(resolveModel('ep-20250101-abcde')).toBe('ep-20250101-abcde')
     expect(resolveModel('奇怪 的 输入')).toBe(DEFAULTS.model)
   })
+
+  it('视频模型走独立的别名表（图片别名不会串到视频上）', () => {
+    expect(resolveModel('fast', 'video')).toBe('doubao-seedance-2-0-fast-260128')
+    expect(resolveModel('mini', 'video')).toBe('doubao-seedance-2-0-mini-260615')
+    expect(resolveModel('2-5', 'video')).toBe('doubao-seedance-2-5-260628')
+    // 关键回归：'flash' 是生图别名，视频侧必须落到视频默认值，而不是生图模型
+    expect(resolveModel('flash', 'video')).toBe(DEFAULTS.videoModel)
+    expect(resolveModel('pro', 'video')).toBe(DEFAULTS.videoModel)
+    expect(resolveModel('', 'video')).toBe(DEFAULTS.videoModel)
+    // 反向：视频别名填进生图字段也不能串
+    expect(resolveModel('fast')).toBe(DEFAULTS.model)
+  })
+
+  it('历史配置里被存成生图 ID 的视频模型会被纠正回视频默认值', () => {
+    expect(resolveModel('doubao-seedream-5-0-flash-260915', 'video')).toBe(DEFAULTS.videoModel)
+    expect(resolveModel('doubao-seedance-2-0-fast-260128')).toBe(DEFAULTS.model)
+  })
+
+  it('原型链上的键不会被当成模型别名（不能返回函数）', () => {
+    const a = resolveModel('toString')
+    const b = resolveModel('constructor', 'video')
+    // 别名表查不到 → 按「手填 ID 原样保留」处理，但绝不能把 Object.prototype 上的函数当模型 ID
+    expect(typeof a).toBe('string')
+    expect(typeof b).toBe('string')
+    expect(a).toBe('toString')
+    expect(b).toBe('constructor')
+  })
+
+  it('保存视频模型时同样做别名解析', () => {
+    saveConfig(file, { videoModel: 'mini' })
+    expect(loadConfig(file, {}).videoModel).toBe('doubao-seedance-2-0-mini-260615')
+  })
 })
 
 describe('密钥不外泄', () => {

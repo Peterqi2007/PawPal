@@ -32,6 +32,9 @@ export interface SeedreamGenerateResult {
   imageSize?: string | null
   status?: number
   meta?: Record<string, unknown>
+  /** 参数适配记录：被省略/回退的字段（不同模型支持度不同） */
+  notes?: Array<{ param: string; action: string; detail: string }>
+  attempts?: number
 }
 
 export interface SeedreamClientDeps {
@@ -56,7 +59,16 @@ export function buildRequestBody(opts: {
   prompt: string
   imageDataUris: string[]
   size?: string
+  outputFormat?: string
 }): Record<string, unknown>
+export function buildImageRequest(opts: {
+  model?: string
+  prompt?: string
+  imageDataUris?: string[]
+  size?: string
+  outputFormat?: string
+  watermark?: boolean
+}): { body: Record<string, unknown>; notes: Array<{ param: string; action: string; detail: string }> }
 export function parseResponse(json: unknown): {
   ok: boolean
   buffer?: Buffer

@@ -39,6 +39,16 @@ const MODEL_ALIASES = {
 
 const STYLES = ['皮克斯3D卡通风格', '写实风格', '2D动漫风格']
 
+// 视频模型别名单独一张表：生图与生视频是两类模型，共用一张表会让
+// videoModel='flash' 被解析成生图模型（请求必然 404）。
+// 已知别名走各自的表；跨类别名/ID 回到本类默认值；其余合法 ID 原样保留（手填兜底）。
+const VIDEO_MODEL_ALIASES = {
+  fast: 'doubao-seedance-2-0-fast-260128',
+  mini: 'doubao-seedance-2-0-mini-260615',
+  '2-0': 'doubao-seedance-2-0-260128',
+  '2-5': 'doubao-seedance-2-5-260628'
+}
+
 const MODEL_ID_RE = /^[A-Za-z0-9._-]{3,80}$/
 
 /** 剥掉误贴的 /images/generations 尾巴，并去掉多余斜杠 */
@@ -52,12 +62,23 @@ function normalizeBaseUrl(url) {
   return u
 }
 
-/** 模型短别名 → 真实 ID；已是完整 ID 则原样返回（允许手填兜底） */
-function resolveModel(value) {
+/** 模型短别名 → 真实 ID；已是完整 ID 则原样返回（允许手填兜底）。kind: 'image' | 'video' */
+function resolveModel(value, kind = 'image') {
   const v = String(value == null ? '' : value).trim()
-  if (!v) return DEFAULTS.model
-  if (MODEL_ALIASES[v]) return MODEL_ALIASES[v]
-  return MODEL_ID_RE.test(v) ? v : DEFAULTS.model
+  const isVideo = kind === 'video'
+  const fallback = isVideo ? DEFAULTS.videoModel : DEFAULTS.model
+  if (!v) return fallback
+  const table = isVideo ? VIDEO_MODEL_ALIASES : MODEL_ALIASES
+  if (Object.prototype.hasOwnProperty.call(table, v)) return table[v]
+
+  // 跨类污染兜底：生图别名填进视频字段（或反之）、以及历史版本把生图 ID 存成视频模型，
+  // 都会让请求打到错误模型上（404/参数不被支持）。这类值一律回到本类默认模型。
+  const otherTable = isVideo ? MODEL_ALIASES : VIDEO_MODEL_ALIASES
+  if (Object.prototype.hasOwnProperty.call(otherTable, v)) return fallback
+  if (isVideo && /^doubao-seedream/i.test(v)) return fallback
+  if (!isVideo && /^doubao-seedance/i.test(v)) return fallback
+
+  return MODEL_ID_RE.test(v) ? v : fallback
 }
 
 /** 端点预设（面板二选一用） */
@@ -107,7 +128,7 @@ function loadConfig(file, env = process.env) {
     apiKey: pick('ARK_API_KEY', 'apiKey', DEFAULTS.apiKey),
     baseUrl: normalizeBaseUrl(pick('ARK_BASE_URL', 'baseUrl', DEFAULTS.baseUrl)),
     model: resolveModel(pick('ARK_MODEL', 'model', DEFAULTS.model)),
-    videoModel: resolveModel(pick('ARK_VIDEO_MODEL', 'videoModel', DEFAULTS.videoModel)),
+    videoModel: resolveModel(pick('ARK_VIDEO_MODEL', 'videoModel', DEFAULTS.videoModel), 'video'),
     style: STYLES.includes(style) ? style : DEFAULTS.style
   }
 }
@@ -132,7 +153,7 @@ function saveConfig(file, patch = {}) {
     if (typeof patch.apiKey === 'string' && patch.apiKey.trim()) next.apiKey = patch.apiKey.trim()
     if (typeof patch.baseUrl === 'string') next.baseUrl = normalizeBaseUrl(patch.baseUrl)
     if (typeof patch.model === 'string') next.model = resolveModel(patch.model)
-    if (typeof patch.videoModel === 'string') next.videoModel = resolveModel(patch.videoModel)
+    if (typeof patch.videoModel === 'string') next.videoModel = resolveModel(patch.videoModel, 'video')
     if (typeof patch.style === 'string' && STYLES.includes(patch.style)) next.style = patch.style
   }
   fs.writeFileSync(file, JSON.stringify(next, null, 2), { mode: 0o600 })
@@ -159,6 +180,7 @@ module.exports = {
   BASE_PLAN,
   DEFAULTS,
   MODEL_ALIASES,
+  VIDEO_MODEL_ALIASES,
   STYLES,
   normalizeBaseUrl,
   resolveModel,

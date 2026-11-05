@@ -5,7 +5,7 @@
 ![CI](https://github.com/Peterqi2007/PawPal/actions/workflows/ci.yml/badge.svg)
 ![Release](https://img.shields.io/github/v/release/Peterqi2007/PawPal)
 ![Platform](https://img.shields.io/badge/平台-macOS%20%7C%20Windows-3e7c5a)
-![Tests](https://img.shields.io/badge/vitest-303%20passed-3e7c5a)
+![Tests](https://img.shields.io/badge/vitest-342%20passed-3e7c5a)
 ![License](https://img.shields.io/github/license/Peterqi2007/PawPal)
 
 > **PawPal 不是一个"桌宠播放器"，而是一条从你家宠物照片到桌面替身的完整生产线**：

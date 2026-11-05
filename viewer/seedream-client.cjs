@@ -15,6 +15,18 @@
 
 const path = require('path')
 const { DEFAULTS } = require('./ark-config.cjs')
+// 参数适配：不同生图模型对 size / output_format 的可选值不同，
+// 预检与 400 兜底统一走 model-params.cjs（与视频侧同一套规则，避免两处漂移）。
+const {
+  IMAGE_DROPPABLE,
+  IMAGE_REQUIRED,
+  MAX_PARAM_RETRIES,
+  buildImageBody,
+  parseRejectedParam,
+  dropParam,
+  nextDropCandidate,
+  describeNotes
+} = require('./model-params.cjs')
 
 const MIN_POSE = 3 // 少于 3 张姿势参考图：提示用户补图，不发请求
 const MAX_POSES = 3 // 实际送去生成的姿势参考图上限
@@ -54,24 +66,22 @@ function pickReferences(items = []) {
   return setup ? [setup, ...poses] : poses
 }
 
-/** 请求体（实跑与 dry-run 共用，单一事实源） */
-function buildRequestBody({ model, prompt, imageDataUris, size = '2K' }) {
-  const body = {
-    model,
-    prompt,
-    image: imageDataUris.slice(0, MAX_REFS),
-    size,
-    output_format: 'png',
-    // 用 b64 而不是 url：省一次下载，也避免把 24h 临时链接写进日志
-    response_format: 'b64_json',
-    // 与 README / docs02 的「保留平台 AI 标识」一致
-    watermark: true
-  }
+/**
+ * 请求体（实跑与 dry-run 共用，单一事实源）。
+ * 返回 { body, notes }：notes 记录被省略/回退的字段，调用方负责落日志与提示。
+ */
+function buildImageRequest(opts = {}) {
+  const { body, notes } = buildImageBody({ ...opts, imageDataUris: (opts.imageDataUris || []).slice(0, MAX_REFS) })
   const bytes = Buffer.byteLength(JSON.stringify(body))
   if (bytes > MAX_BODY_BYTES) {
     throw new Error(`请求体 ${Math.round(bytes / 1024 / 1024)}MB 超过上限，请减少参考图`)
   }
-  return body
+  return { body, notes }
+}
+
+/** 只要请求体时的便捷入口 */
+function buildRequestBody(opts = {}) {
+  return buildImageRequest(opts).body
 }
 
 /** 解析响应：成功返回 Buffer，失败返回可读错误 */
@@ -92,8 +102,8 @@ function parseResponse(json) {
   return { ok: true, buffer: buf, usage: json.usage || null, size: item.size || null }
 }
 
-/** HTTP 状态码 → 可操作的中文提示 */
-function mapHttpError(status, text) {
+/** HTTP 状态码 → 可操作的中文提示（notes 用于说明已省略过哪些字段） */
+function mapHttpError(status, text, { notes } = {}) {
   let detail = ''
   try {
     const j = JSON.parse(text)
@@ -108,7 +118,13 @@ function mapHttpError(status, text) {
   if (status === 404) return '模型或端点不存在：请检查模型 ID 与端点' + tail
   if (status === 429) return '调用过于频繁，请稍后再试' + tail
   if (status >= 500) return '服务端错误，请稍后再试' + tail
-  if (status === 400) return '请求被拒绝：' + (detail || '参数不合法')
+  if (status === 400 || status === 422) {
+    const dropped = describeNotes(notes)
+    if (dropped) {
+      return `参数不被支持：${detail || '模型拒绝了该请求'}（已自动省略 ${dropped} 后仍失败——请在设置里换一个生图模型）`
+    }
+    return '请求被拒绝：' + (detail || '参数不合法')
+  }
   return `请求失败（HTTP ${status}）${tail}`
 }
 
@@ -163,12 +179,14 @@ function createSeedreamClient({ fetchImpl, encodeImage, readFile } = {}) {
     if (!dataUris.length) return { ok: false, error: '参考图读取失败（可能是文件已被删除）' }
 
     const prompt = buildPrompt({ style: cfg.style, petName })
-    let body
+    let built
     try {
-      body = buildRequestBody({ model: cfg.model, prompt, imageDataUris: dataUris, size })
+      built = buildImageRequest({ model: cfg.model, prompt, imageDataUris: dataUris, size })
     } catch (e) {
       return { ok: false, error: e && e.message ? e.message : String(e) }
     }
+    let body = built.body
+    const notes = [...built.notes]
 
     const url = `${String(cfg.baseUrl).replace(/\/+$/, '')}/images/generations`
     if (dryRun) {
@@ -176,6 +194,7 @@ function createSeedreamClient({ fetchImpl, encodeImage, readFile } = {}) {
         ok: true,
         dryRun: true,
         requestBody: body,
+        notes,
         meta: { url, refCount: dataUris.length, refs: refs.map((r) => ({ role: r.role, file: r.file })) }
       }
     }
@@ -188,37 +207,80 @@ function createSeedreamClient({ fetchImpl, encodeImage, readFile } = {}) {
       else signal.addEventListener('abort', onAbort, { once: true })
     }
     try {
-      const res = await fetchImpl(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${cfg.apiKey}`
-        },
-        body: JSON.stringify(body),
-        signal: controller.signal
-      })
-      const text = await res.text()
-      if (!res.ok) {
-        return { ok: false, error: mapHttpError(res.status, text), status: res.status }
+      for (let attempt = 0; ; attempt++) {
+        let res
+        let text
+        try {
+          res = await fetchImpl(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${cfg.apiKey}`
+            },
+            body: JSON.stringify(body),
+            signal: controller.signal
+          })
+          text = await res.text()
+        } catch (e) {
+          const aborted = e && (e.name === 'AbortError' || controller.signal.aborted)
+          return {
+            ok: false,
+            error: aborted ? '请求超时或已取消' : `网络错误：${e && e.message ? e.message : e}`,
+            notes
+          }
+        }
+        if (res.ok) {
+          let json
+          try {
+            json = JSON.parse(text)
+          } catch {
+            return { ok: false, error: '响应解析失败（非 JSON）', notes }
+          }
+          const parsed = parseResponse(json)
+          if (!parsed.ok) return { ok: false, error: parsed.error, notes }
+          return {
+            ok: true,
+            buffer: parsed.buffer,
+            usage: parsed.usage,
+            imageSize: parsed.size,
+            notes,
+            attempts: attempt + 1,
+            meta: { url, refCount: dataUris.length, model: cfg.model, prompt }
+          }
+        }
+        // 400 兜底：模型不认某个字段时省略它再试。
+        // 必填字段（prompt / image / response_format）永不省略——response_format 决定响应形状。
+        const rejected = parseRejectedParam(res.status, text)
+        if (rejected && attempt < MAX_PARAM_RETRIES) {
+          const name = rejected.param || nextDropCandidate(body, IMAGE_DROPPABLE)
+          if (name && IMAGE_REQUIRED.includes(name)) {
+            return {
+              ok: false,
+              error: `模型要求去掉必填参数 ${name}，当前链路无法自动适配：${String(rejected.detail || '').slice(0, 160)}`,
+              status: res.status,
+              notes
+            }
+          }
+          const next = name ? dropParam(body, name) : null
+          if (next) {
+            notes.push({
+              param: name,
+              action: 'drop',
+              detail: String(rejected.detail || '').slice(0, 160) || '模型拒绝该参数'
+            })
+            console.warn(`[PawPal][seedream] 模型拒绝参数 ${name}，已省略后重试（第 ${attempt + 2} 次请求）`)
+            body = next
+            continue
+          }
+        }
+        return {
+          ok: false,
+          error: mapHttpError(res.status, text, { notes }),
+          status: res.status,
+          notes,
+          attempts: attempt + 1
+        }
       }
-      let json
-      try {
-        json = JSON.parse(text)
-      } catch {
-        return { ok: false, error: '响应解析失败（非 JSON）' }
-      }
-      const parsed = parseResponse(json)
-      if (!parsed.ok) return { ok: false, error: parsed.error }
-      return {
-        ok: true,
-        buffer: parsed.buffer,
-        usage: parsed.usage,
-        imageSize: parsed.size,
-        meta: { url, refCount: dataUris.length, model: cfg.model, prompt }
-      }
-    } catch (e) {
-      const aborted = e && (e.name === 'AbortError' || controller.signal.aborted)
-      return { ok: false, error: aborted ? '请求超时或已取消' : `网络错误：${e && e.message ? e.message : e}` }
     } finally {
       clearTimeout(timer)
       if (signal) signal.removeEventListener('abort', onAbort)
@@ -237,6 +299,7 @@ module.exports = {
   evaluateReadiness,
   buildPrompt,
   pickReferences,
+  buildImageRequest,
   buildRequestBody,
   parseResponse,
   mapHttpError,

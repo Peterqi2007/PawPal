@@ -199,3 +199,64 @@ describe('客户端编排（注入假 fetch）', () => {
     expect(calls).toHaveLength(0)
   })
 })
+
+// 生图模型同样存在「不同模型参数不同」：size 关键字、output_format 支持度都可能不一样。
+describe('参数适配（跨模型鲁棒性）', () => {
+  const encode = () => PNG_1PX
+  const okPayload = { data: [{ b64_json: Buffer.from('img').toString('base64') }] }
+
+  function mockFetch(handler: (body: any, n: number) => any) {
+    const calls: Array<{ url: string; init: any }> = []
+    const fetchImpl = async (url: string, init: any = {}) => {
+      calls.push({ url, init })
+      return handler(JSON.parse(String(init.body)), calls.length)
+    }
+    return { fetchImpl, calls }
+  }
+
+  it('模型拒绝 size → 省略后重试成功，notes/attempts 可追溯', async () => {
+    const { fetchImpl, calls } = mockFetch((_body, n) => {
+      if (n === 1) {
+        return {
+          ok: false,
+          status: 400,
+          text: async () => JSON.stringify({ error: { message: 'The parameter `size` is not supported' } })
+        }
+      }
+      return { ok: true, status: 200, text: async () => JSON.stringify(okPayload) }
+    })
+    const client = createSeedreamClient({ fetchImpl, encodeImage: encode })
+    const r = await client.generate({ cfg: CFG, items: makeItems(1, 3), imagesDir: '/x', size: '2K' })
+    expect(r.ok).toBe(true)
+    expect(r.attempts).toBe(2)
+    expect(r.notes?.map((n: any) => n.param)).toEqual(['size'])
+    const second = JSON.parse(String(calls[1].init.body))
+    expect(second.size).toBeUndefined()
+    expect(second.response_format).toBe('b64_json') // 必填字段一个不动
+    expect(second.image).toHaveLength(MAX_REFS)
+  })
+
+  it('必填字段 response_format 被拒 → 不重试，给出明确原因', async () => {
+    const { fetchImpl, calls } = mockFetch(() => ({
+      ok: false,
+      status: 400,
+      text: async () =>
+        JSON.stringify({ error: { message: 'The parameter `response_format` is not supported' } })
+    }))
+    const client = createSeedreamClient({ fetchImpl, encodeImage: encode })
+    const r = await client.generate({ cfg: CFG, items: makeItems(1, 3), imagesDir: '/x' })
+    expect(r.ok).toBe(false)
+    expect(calls).toHaveLength(1)
+    expect(r.error).toContain('response_format')
+  })
+
+  it('非法 size 在预检阶段就不发出去（dryRun 可见）', async () => {
+    const { fetchImpl, calls } = okFetch({ data: [] })
+    const client = createSeedreamClient({ fetchImpl, encodeImage: encode })
+    const r = await client.generate({ cfg: CFG, items: makeItems(1, 3), imagesDir: '/x', size: 'huge', dryRun: true })
+    expect(r.ok).toBe(true)
+    expect((r.requestBody as any).size).toBeUndefined()
+    expect(r.notes?.map((n: any) => n.param)).toContain('size')
+    expect(calls).toHaveLength(0)
+  })
+})

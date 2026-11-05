@@ -26,10 +26,11 @@ export const BASE_STANDARD: string
 export const BASE_PLAN: string
 export const DEFAULTS: ArkConfig
 export const MODEL_ALIASES: Record<string, string>
+export const VIDEO_MODEL_ALIASES: Record<string, string>
 export const STYLES: string[]
 
 export function normalizeBaseUrl(url: string): string
-export function resolveModel(value: string): string
+export function resolveModel(value: string, kind?: 'image' | 'video'): string
 export function baseUrlPreset(kind: string): string
 export function baseUrlKind(url: string): 'standard' | 'plan'
 export function maskKey(key: string): string

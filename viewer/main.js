@@ -12,7 +12,7 @@ const { createSeedreamClient, evaluateReadiness, MAX_EDGE, MIN_POSE } = require(
 const {
   createSeedanceClient,
   buildVideoPrompt,
-  buildTaskBody
+  buildTaskRequest
 } = require('./seedance-client.cjs')
 const { buildActionSpec, safeSlug, DEFAULT_CELL, DEFAULT_FRAMES, greenRatioOfBitmap } = require('./animator.cjs')
 const { assemblePet, collectSheets, safeId } = require('./pet-assembler.cjs')
@@ -1210,18 +1210,29 @@ ipcMain.handle('anim:generate', async (_evt, groupId, opts) => {
     if (!dataUri) return fail('首帧图读取失败（文件可能已被删除）')
     console.log(`[PawPal][动画] 首帧来源: ${sourceImage.originalName} (source=${sourceImage.source || 'upload'})`)
 
-    // 2. 建任务
+    // 2. 建任务（请求体先过参数适配层：不同模型支持的字段不同，预检 + 400 兜底都在那一层）
     animNotify({ stage: 'submit', action })
-    const body = buildTaskBody({
+    const request = buildTaskRequest({
       model: cfg.videoModel,
       prompt: buildVideoPrompt({ actionDesc: ACTION_DESC[action] || action, style: cfg.style }),
       imageDataUri: dataUri,
       duration: Number(options.duration) || 5
     })
-    const created = await seedance.createTask({ cfg, body })
+    if (request.notes.length) {
+      console.log(`[PawPal][动画] 请求体参数适配（${cfg.videoModel}）:`, JSON.stringify(request.notes))
+    }
+    const created = await seedance.createTask({ cfg, body: request.body })
+    const paramNotes = [...request.notes, ...(created.notes || [])]
+    if (created.notes && created.notes.length) {
+      const names = [...new Set(created.notes.map((n) => n.param))]
+      console.warn(
+        `[PawPal][动画] 模型 ${cfg.videoModel} 拒绝 ${names.join('/')}，已自动省略并重试（第 ${created.attempts} 次请求）`
+      )
+      animNotify({ stage: 'submit', action, adapted: names })
+    }
     if (!created.ok) {
       console.error('[PawPal][动画] 建任务失败:', created.error)
-      return fail(created.error)
+      return fail(created.error, { paramNotes })
     }
     const taskStartedAt = Date.now()
     const taskBase = {
@@ -1229,7 +1240,9 @@ ipcMain.handle('anim:generate', async (_evt, groupId, opts) => {
       taskId: created.taskId,
       model: cfg.videoModel,
       firstFrame: sourceImage.originalName,
-      createdAt: taskStartedAt
+      createdAt: taskStartedAt,
+      // 参数适配留痕：事后查「为什么这次没传 ratio / resolution」有据可依
+      adaptedParams: [...new Set(paramNotes.map((n) => n.param))]
     }
     console.log(`[PawPal][动画] 任务已创建: ${created.taskId}（模型 ${cfg.videoModel}）`)
     writeAnimTask(dir, action, { ...taskBase, status: 'running' })
@@ -1330,6 +1343,7 @@ ipcMain.handle('anim:generate', async (_evt, groupId, opts) => {
       frameSource: sourceImage.originalName,
       frameGreen: Math.round(greenPick.green * 100),
       usage: polled.usage || null,
+      paramNotes,
       ...refsStore.state(gid)
     }
   } catch (e) {

@@ -51,6 +51,21 @@ export function buildTaskBody(opts: {
   resolution?: string
   watermark?: boolean
 }): SeedanceTaskBody
+export function buildTaskRequest(opts: {
+  model?: string
+  prompt?: string
+  imageDataUri?: string | null
+  duration?: number | string
+  ratio?: string
+  resolution?: string
+  watermark?: boolean
+  seed?: number | string
+  cameraFixed?: boolean
+}): {
+  body: SeedanceTaskBody
+  profile: { id: string; family: string; ratioWithImage: boolean; supportsSeed: boolean; supportsCameraFixed: boolean }
+  notes: Array<{ param: string; action: string; detail: string }>
+}
 export function mapHttpError(status: number, text: string): string
 export function parseTaskCreated(json: unknown): { ok: boolean; taskId?: string; status?: string; error?: string }
 export function parseTaskStatus(json: unknown): {
